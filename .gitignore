@@ -1,6 +1,7 @@
 # Build results
 bin/
 obj/
+reactions/
 
 # Visual Studio Code
 .vscode/
