@@ -17,6 +17,9 @@ jobs:
         username: ${{ secrets.SERVER_USER }}
         key: ${{ secrets.SERVER_SSH_KEY }}
         port: 22
+        debug: true
+        timeout: 60s
+        command_timeout: 15m
         script: |
           echo "🚀 Starting deployment..."
           
