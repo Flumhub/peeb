@@ -1,0 +1,51 @@
+name: Deploy Peeb Bot
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Deploy to Server
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.SERVER_HOST }}
+        username: ${{ secrets.SERVER_USER }}
+        key: ${{ secrets.SERVER_SSH_KEY }}
+        port: 22
+        script: |
+          echo "🚀 Starting deployment..."
+          
+          # Navigate to project directory
+          cd /opt/peeb
+          
+          # Stop the bot
+          echo "⏹️ Stopping bot service..."
+          systemctl stop peeb-bot
+          
+          # Pull latest changes
+          echo "📥 Pulling latest changes..."
+          git pull origin main
+          
+          # Build the project
+          echo "🔨 Building project..."
+          dotnet build -c Release
+          
+          # Fix permissions
+          echo "🔒 Setting permissions..."
+          chown -R peeb-bot:peeb-bot /opt/peeb
+          
+          # Start the bot
+          echo "▶️ Starting bot service..."
+          systemctl start peeb-bot
+          
+          # Check status
+          echo "✅ Deployment complete! Checking status..."
+          sleep 3
+          systemctl is-active peeb-bot
+          
+          echo "🎉 Peeb is now running the latest version!"
