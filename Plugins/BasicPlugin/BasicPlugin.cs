@@ -136,7 +136,7 @@ namespace DiscordBot.Plugins.BasicPlugin
                     .WithColor(Color.Green)
                     .Build();
 
-                await message.Channel.SendMessageAsync(embed: embed.Build());
+                await message.Channel.SendMessageAsync(embed: embed);
             }
             else
             {
