@@ -21,6 +21,13 @@ reactions/
 reactions.json
 aliases.json
 
+aliases.json
+reactions.json
+reminders.json
+
+appsettings.json
+appsettings.*.json
+
 # Log files
 *.log
 
