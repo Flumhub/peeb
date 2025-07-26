@@ -22,15 +22,45 @@ jobs:
           cd /opt/peeb
           echo "⏹️ Stopping bot service..."
           systemctl stop peeb-bot
+          
+          echo "💾 Backing up config files..."
+          # Create backup directory with timestamp
+          BACKUP_DIR="/opt/peeb/backup_$(date +%Y%m%d_%H%M%S)"
+          mkdir -p "$BACKUP_DIR"
+          
+          # Backup config files if they exist
+          [ -f "aliases.json" ] && cp aliases.json "$BACKUP_DIR/"
+          [ -f "reactions.json" ] && cp reactions.json "$BACKUP_DIR/"
+          [ -f "reminders.json" ] && cp reminders.json "$BACKUP_DIR/"
+          [ -f "appsettings.json" ] && cp appsettings.json "$BACKUP_DIR/"
+          
+          # Also create quick restore copies
+          [ -f "aliases.json" ] && cp aliases.json aliases.json.restore
+          [ -f "reactions.json" ] && cp reactions.json reactions.json.restore
+          [ -f "reminders.json" ] && cp reminders.json reminders.json.restore
+          [ -f "appsettings.json" ] && cp appsettings.json appsettings.json.restore
+          
           echo "📥 Pulling latest changes..."
+          git reset --hard HEAD
+          git clean -fd
           git pull origin main
+          
+          echo "🔄 Restoring config files..."
+          # Restore config files if backups exist
+          [ -f "aliases.json.restore" ] && mv aliases.json.restore aliases.json
+          [ -f "reactions.json.restore" ] && mv reactions.json.restore reactions.json
+          [ -f "reminders.json.restore" ] && mv reminders.json.restore reminders.json
+          [ -f "appsettings.json.restore" ] && mv appsettings.json.restore appsettings.json
+          
+          echo "🧹 Cleaning up old backups (keep last 5)..."
+          ls -t backup_* 2>/dev/null | tail -n +6 | xargs rm -rf 2>/dev/null || true
+          
           echo "🔨 Building project..."
           dotnet build -c Release
-          echo "🔒 Setting permissions..."
-          chown -R peeb-bot:peeb-bot /opt/peeb
+          
           echo "▶️ Starting bot service..."
           systemctl start peeb-bot
           echo "✅ Deployment complete!"
           sleep 3
           systemctl is-active peeb-bot
-          echo "🎉 Peeb is now running the latest version!"
+          echo "🎉 Peeb is now running the latest version with preserved config!"
