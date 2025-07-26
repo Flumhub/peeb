@@ -76,19 +76,50 @@ namespace DiscordBot.Plugins.BasicPlugin
         private async Task SendHelpMessage(SocketMessage message)
         {
             var embed = new EmbedBuilder()
-                .WithTitle("Bot Commands")
-                .WithDescription("Here are the available commands:")
-                .AddField($"{_configService.CommandPrefix}ping", "Check if bot is responsive")
-                .AddField($"{_configService.CommandPrefix}hello", "Say hello")
-                .AddField($"{_configService.CommandPrefix}info", "Get server information")
-                .AddField($"{_configService.CommandPrefix}addreaction [name]", "Save attached file as reaction")
-                .AddField($"{_configService.CommandPrefix}deletereaction [name]", "Delete saved reaction")
-                .AddField($"{_configService.CommandPrefix}reactions", "List all saved reactions")
+                .WithTitle("🤖 Peeb Bot Commands")
+                .WithDescription("Here are all the available commands:")
                 .WithColor(Color.Blue)
-                .WithCurrentTimestamp()
-                .Build();
+                .WithCurrentTimestamp();
 
-            await message.Channel.SendMessageAsync(embed: embed);
+            // Basic Commands
+            embed.AddField("**🔧 Basic Commands**",
+                $"`{_configService.CommandPrefix}ping` - Check if bot is responsive\n" +
+                $"`{_configService.CommandPrefix}hello` - Say hello\n" +
+                $"`{_configService.CommandPrefix}info` - Get server information\n" +
+                $"`{_configService.CommandPrefix}help` - Show this help message", false);
+
+            // Reaction Commands
+            embed.AddField("**😄 Reaction Commands**",
+                $"`{_configService.CommandPrefix}addreaction [name]` - Save attached file as reaction\n" +
+                $"`{_configService.CommandPrefix}deletereaction [name]` - Delete saved reaction\n" +
+                $"`{_configService.CommandPrefix}changereaction [name]` - Replace reaction with new file\n" +
+                $"`{_configService.CommandPrefix}renamereaction [old] [new]` - Rename reaction\n" +
+                $"`{_configService.CommandPrefix}reactions` - List all saved reactions", false);
+
+            // Alias Commands
+            embed.AddField("**🔗 Alias Commands**",
+                $"`{_configService.CommandPrefix}addalias [reaction] [alias1] [alias2]...` - Add aliases\n" +
+                $"`{_configService.CommandPrefix}removealias [alias]` - Remove an alias\n" +
+                $"`{_configService.CommandPrefix}renamealias [old] [new]` - Rename an alias", false);
+
+            // Reminder Commands
+            embed.AddField("**⏰ Reminder Commands**",
+                $"`{_configService.CommandPrefix}remindme [time] [message]` - Set a reminder\n" +
+                $"`{_configService.CommandPrefix}remind me [time] [message]` - Alternative syntax\n" +
+                $"`{_configService.CommandPrefix}myreminders` - List your active reminders\n" +
+                $"`{_configService.CommandPrefix}cancelreminder [id]` - Cancel a reminder", false);
+
+            // Examples
+            embed.AddField("**📝 Reminder Examples**",
+                $"`{_configService.CommandPrefix}remindme in 2 hours take a break`\n" +
+                $"`{_configService.CommandPrefix}remindme at 3pm call mom`\n" +
+                $"`{_configService.CommandPrefix}remindme tomorrow at 9am meeting`\n" +
+                $"`{_configService.CommandPrefix}remindme Dec 25 Christmas!`\n" +
+                $"`{_configService.CommandPrefix}remindme in 1 day 5 hours check server`", false);
+
+            embed.WithFooter("💡 You can also just type reaction names (like 'thanks' or 'haha') to use saved reactions!");
+
+            await message.Channel.SendMessageAsync(embed: embed.Build());
         }
 
         private async Task SendServerInfo(SocketMessage message)
@@ -105,7 +136,7 @@ namespace DiscordBot.Plugins.BasicPlugin
                     .WithColor(Color.Green)
                     .Build();
 
-                await message.Channel.SendMessageAsync(embed: embed);
+                await message.Channel.SendMessageAsync(embed: embed.Build());
             }
             else
             {

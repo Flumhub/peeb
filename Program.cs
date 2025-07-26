@@ -6,6 +6,7 @@ using DiscordBot.Core;
 using DiscordBot.Core.Services;
 using DiscordBot.Plugins.BasicPlugin;
 using DiscordBot.Plugins.ReactionPlugin;
+using DiscordBot.Plugins.ReminderPlugin;
 
 namespace DiscordBot
 {
@@ -31,6 +32,7 @@ namespace DiscordBot
             // Register plugins
             _pluginManager.RegisterPlugin(_services.GetRequiredService<BasicPlugin>());
             _pluginManager.RegisterPlugin(_services.GetRequiredService<ReactionPlugin>());
+            _pluginManager.RegisterPlugin(_services.GetRequiredService<ReminderPlugin>());
 
             // Setup event handlers
             _client.Log += LogAsync;
@@ -70,6 +72,7 @@ namespace DiscordBot
                 .AddSingleton<PluginManager>()
                 .AddSingleton<BasicPlugin>()
                 .AddSingleton<ReactionPlugin>()
+                .AddSingleton<ReminderPlugin>()
                 .BuildServiceProvider();
         }
 
