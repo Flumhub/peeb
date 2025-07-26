@@ -102,20 +102,35 @@ namespace DiscordBot.Plugins.BasicPlugin
                 $"`{_configService.CommandPrefix}removealias [alias]` - Remove an alias\n" +
                 $"`{_configService.CommandPrefix}renamealias [old] [new]` - Rename an alias", false);
 
-            // Reminder Commands
-            embed.AddField("**⏰ Reminder Commands**",
+            // One-Time Reminder Commands
+            embed.AddField("**⏰ One-Time Reminders**",
                 $"`{_configService.CommandPrefix}remindme [time] [message]` - Set a reminder\n" +
                 $"`{_configService.CommandPrefix}remind me [time] [message]` - Alternative syntax\n" +
                 $"`{_configService.CommandPrefix}myreminders` - List your active reminders\n" +
                 $"`{_configService.CommandPrefix}cancelreminder [id]` - Cancel a reminder", false);
 
-            // Examples
-            embed.AddField("**📝 Reminder Examples**",
+            // Recurring Reminder Commands
+            embed.AddField("**🔄 Recurring Reminders**",
+                $"`{_configService.CommandPrefix}every day [at time] [message]` - Daily reminders\n" +
+                $"`{_configService.CommandPrefix}every week [on day(s)] [at time] [message]` - Weekly reminders\n" +
+                $"`{_configService.CommandPrefix}every month [on day] [at time] [message]` - Monthly reminders\n" +
+                $"`{_configService.CommandPrefix}every [N] days/weeks/months` - Custom intervals", false);
+
+            // One-Time Examples
+            embed.AddField("**📝 One-Time Examples**",
                 $"`{_configService.CommandPrefix}remindme in 2 hours take a break`\n" +
                 $"`{_configService.CommandPrefix}remindme at 3pm call mom`\n" +
                 $"`{_configService.CommandPrefix}remindme tomorrow at 9am meeting`\n" +
-                $"`{_configService.CommandPrefix}remindme Dec 25 Christmas!`\n" +
-                $"`{_configService.CommandPrefix}remindme in 1 day 5 hours check server`", false);
+                $"`{_configService.CommandPrefix}remindme Dec 25 Christmas!`", false);
+
+            // Recurring Examples
+            embed.AddField("**🔄 Recurring Examples**",
+                $"`{_configService.CommandPrefix}every day at 9am take vitamins`\n" +
+                $"`{_configService.CommandPrefix}every week on monday at 2pm team meeting`\n" +
+                $"`{_configService.CommandPrefix}every month on the 15th pay bills`\n" +
+                $"`{_configService.CommandPrefix}every 2 weeks on tuesday and friday standup`\n" +
+                $"`{_configService.CommandPrefix}every month on the first monday review goals`\n" +
+                $"`{_configService.CommandPrefix}every month on the last day reports`", false);
 
             embed.WithFooter("💡 You can also just type reaction names (like 'thanks' or 'haha') to use saved reactions!");
 

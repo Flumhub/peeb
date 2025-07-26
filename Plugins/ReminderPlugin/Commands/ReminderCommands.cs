@@ -2,6 +2,7 @@ using Discord;
 using Discord.WebSocket;
 using DiscordBot.Core.Interfaces;
 using DiscordBot.Plugins.ReminderPlugin.Services;
+using DiscordBot.Plugins.ReminderPlugin.Models;
 using System.Text.RegularExpressions;
 
 namespace DiscordBot.Plugins.ReminderPlugin.Commands
@@ -191,10 +192,20 @@ namespace DiscordBot.Plugins.ReminderPlugin.Commands
                     ? $"in {(int)timeUntil.TotalHours} hours"
                     : $"in {(int)timeUntil.TotalMinutes} minutes";
 
-                embed.AddField(
-                    $"⏰ {reminder.TriggerTime:MMM dd, h:mm tt}",
-                    $"**{reminder.Message}**\n{timeDesc} • ID: `{reminder.Id[..8]}`",
-                    false);
+                var reminderTitle = reminder.IsRecurring 
+                    ? $"🔄 {reminder.TriggerTime:MMM dd, h:mm tt} ({GetRecurrenceDescription(reminder)})"
+                    : $"⏰ {reminder.TriggerTime:MMM dd, h:mm tt}";
+
+                var reminderDescription = $"**{reminder.Message}**\n{timeDesc}";
+                
+                if (reminder.IsRecurring)
+                {
+                    reminderDescription += $" • Triggered {reminder.TriggerCount} times";
+                }
+                
+                reminderDescription += $" • ID: `{reminder.Id[..8]}`";
+
+                embed.AddField(reminderTitle, reminderDescription, false);
             }
 
             if (reminders.Count > 10)
@@ -204,6 +215,40 @@ namespace DiscordBot.Plugins.ReminderPlugin.Commands
 
             await message.Channel.SendMessageAsync(embed: embed.Build());
             return true;
+        }
+
+        private string GetRecurrenceDescription(Reminder reminder)
+        {
+            switch (reminder.RecurrenceType)
+            {
+                case RecurrenceType.Daily:
+                    return reminder.RecurrenceInterval == 1 ? "Daily" : $"Every {reminder.RecurrenceInterval} days";
+                
+                case RecurrenceType.Weekly:
+                    if (reminder.RecurrenceDays.Any())
+                    {
+                        var dayNames = reminder.RecurrenceDays.Select(d => d.ToString().Substring(0, 3)).ToList();
+                        var dayString = string.Join(", ", dayNames);
+                        return reminder.RecurrenceInterval == 1 ? $"Weekly on {dayString}" : $"Every {reminder.RecurrenceInterval} weeks on {dayString}";
+                    }
+                    return reminder.RecurrenceInterval == 1 ? "Weekly" : $"Every {reminder.RecurrenceInterval} weeks";
+                
+                case RecurrenceType.Monthly:
+                    if (reminder.MonthlyDay.HasValue)
+                    {
+                        var dayDesc = reminder.MonthlyDay.Value == -1 ? "last day" : $"day {reminder.MonthlyDay.Value}";
+                        return reminder.RecurrenceInterval == 1 ? $"Monthly on {dayDesc}" : $"Every {reminder.RecurrenceInterval} months on {dayDesc}";
+                    }
+                    else if (reminder.WeekOfMonth.HasValue && reminder.WeeklyDayOfWeek.HasValue)
+                    {
+                        var weekDesc = reminder.WeekOfMonth.Value == WeekOfMonth.Last ? "last" : reminder.WeekOfMonth.Value.ToString().ToLower();
+                        return reminder.RecurrenceInterval == 1 ? $"Monthly on {weekDesc} {reminder.WeeklyDayOfWeek.Value}" : $"Every {reminder.RecurrenceInterval} months on {weekDesc} {reminder.WeeklyDayOfWeek.Value}";
+                    }
+                    return reminder.RecurrenceInterval == 1 ? "Monthly" : $"Every {reminder.RecurrenceInterval} months";
+                
+                default:
+                    return "Unknown";
+            }
         }
     }
 

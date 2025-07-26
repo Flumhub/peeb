@@ -10,7 +10,7 @@ namespace DiscordBot.Plugins.ReminderPlugin
     public class ReminderPlugin : IPlugin
     {
         public string Name => "Reminder System";
-        public string Description => "Set and manage reminders with flexible time parsing";
+        public string Description => "Set and manage reminders with flexible time parsing and recurring functionality";
 
         private readonly ConfigurationService _configService;
         private readonly ReminderService _reminderService;
@@ -28,10 +28,11 @@ namespace DiscordBot.Plugins.ReminderPlugin
 
             // Register commands
             _commands.Add(new RemindMeCommand(_reminderService));
+            _commands.Add(new EveryReminderCommand(_reminderService));
             _commands.Add(new MyRemindersCommand(_reminderService));
             _commands.Add(new CancelReminderCommand(_reminderService));
 
-            Console.WriteLine($"[DEBUG] Reminder plugin initialized");
+            Console.WriteLine($"[DEBUG] Reminder plugin initialized with recurring functionality");
         }
 
         public async Task<bool> HandleMessageAsync(SocketMessage message)
