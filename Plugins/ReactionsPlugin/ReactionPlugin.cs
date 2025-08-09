@@ -84,19 +84,34 @@ namespace DiscordBot.Plugins.ReactionPlugin
 
         private async Task<bool> CheckSavedReactions(SocketMessage message, string content)
         {
-            // Get and sanitize the first word
-            string firstWord = GetFirstWordSanitized(content);
+            // First try exact match with just basic sanitization
+            string exactMatch = content.ToLower().Trim();
+            
+            // Check direct reactions with exact match
+            if (_reactions.ContainsKey(exactMatch))
+            {
+                return await SendReactionFile(message, _reactions[exactMatch]);
+            }
+
+            // Check aliases with exact match
+            if (_aliases.ContainsKey(exactMatch) && _reactions.ContainsKey(_aliases[exactMatch]))
+            {
+                return await SendReactionFile(message, _reactions[_aliases[exactMatch]]);
+            }
+            
+            // Now try with punctuation removed (for things like "thanks!")
+            string sanitized = GetFirstWordSanitized(content);
             
             // Check direct reactions
-            if (_reactions.ContainsKey(firstWord))
+            if (_reactions.ContainsKey(sanitized))
             {
-                return await SendReactionFile(message, _reactions[firstWord]);
+                return await SendReactionFile(message, _reactions[sanitized]);
             }
 
             // Check aliases
-            if (_aliases.ContainsKey(firstWord) && _reactions.ContainsKey(_aliases[firstWord]))
+            if (_aliases.ContainsKey(sanitized) && _reactions.ContainsKey(_aliases[sanitized]))
             {
-                return await SendReactionFile(message, _reactions[_aliases[firstWord]]);
+                return await SendReactionFile(message, _reactions[_aliases[sanitized]]);
             }
 
             return false;
