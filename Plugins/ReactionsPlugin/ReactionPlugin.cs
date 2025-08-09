@@ -87,6 +87,20 @@ namespace DiscordBot.Plugins.ReactionPlugin
             // First try exact match with just basic sanitization
             string exactMatch = content.ToLower().Trim();
             
+            // Debug logging for problematic reactions
+            if (content.Contains("z") || content.Contains("g"))
+            {
+                Console.WriteLine($"[DEBUG] Checking reaction for: '{content}'");
+                Console.WriteLine($"[DEBUG] Exact match string: '{exactMatch}'");
+                Console.WriteLine($"[DEBUG] Bytes: {string.Join(" ", System.Text.Encoding.UTF8.GetBytes(exactMatch).Select(b => b.ToString("X2")))}");
+                
+                // Log all reactions that contain 'g' or 'z' for comparison
+                foreach (var r in _reactions.Keys.Where(k => k.Contains("g") || k.Contains("z")))
+                {
+                    Console.WriteLine($"[DEBUG] Available reaction: '{r}' - Bytes: {string.Join(" ", System.Text.Encoding.UTF8.GetBytes(r).Select(b => b.ToString("X2")))}");
+                }
+            }
+            
             // Check direct reactions with exact match
             if (_reactions.ContainsKey(exactMatch))
             {
@@ -97,6 +111,25 @@ namespace DiscordBot.Plugins.ReactionPlugin
             if (_aliases.ContainsKey(exactMatch) && _reactions.ContainsKey(_aliases[exactMatch]))
             {
                 return await SendReactionFile(message, _reactions[_aliases[exactMatch]]);
+            }
+            
+            // Try removing any non-ASCII characters and special characters
+            string cleanedMatch = Regex.Replace(exactMatch, @"[^\w\s-]", "").Trim();
+            
+            if (cleanedMatch != exactMatch)
+            {
+                Console.WriteLine($"[DEBUG] Cleaned match: '{cleanedMatch}'");
+                
+                // Check with cleaned version
+                if (_reactions.ContainsKey(cleanedMatch))
+                {
+                    return await SendReactionFile(message, _reactions[cleanedMatch]);
+                }
+                
+                if (_aliases.ContainsKey(cleanedMatch) && _reactions.ContainsKey(_aliases[cleanedMatch]))
+                {
+                    return await SendReactionFile(message, _reactions[_aliases[cleanedMatch]]);
+                }
             }
             
             // Now try with punctuation removed (for things like "thanks!")
