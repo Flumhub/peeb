@@ -34,3 +34,5 @@ appsettings.*.json
 # OS generated files
 .DS_Store
 Thumbs.db
+
+setup-config.ps1
