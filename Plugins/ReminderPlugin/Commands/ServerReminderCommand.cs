@@ -10,8 +10,8 @@ namespace DiscordBot.Plugins.ReminderPlugin.Commands
     public class ServerReminderCommand : ICommandHandler
     {
         public string Command => "serverreminder";
-        public string Description => "Set a recurring server-wide reminder (owner only)";
-        public string Usage => "serverreminder every [interval] [at time] [message] - attach an image optionally";
+        public string Description => "Set a recurring server-wide reminder";
+        public string Usage => "serverreminder every [interval] at [time] [message]";
 
         private readonly ReminderService _reminderService;
 
@@ -27,7 +27,7 @@ namespace DiscordBot.Plugins.ReminderPlugin.Commands
                 await message.Channel.SendMessageAsync($"Usage: `{Usage}`\n\n" +
                     "Examples:\n" +
                     "• `peeb serverreminder every day at 9am Check in to HoYoLAB!`\n" +
-                    "• `peeb serverreminder every day at 12pm Lunch time reminder` (attach image)\n" +
+                    "• `peeb serverreminder every day at 14:30 Lunch time reminder`\n" +
                     "• `peeb serverreminder every week on monday at 10am Weekly reset!`");
                 return true;
             }
@@ -43,8 +43,10 @@ namespace DiscordBot.Plugins.ReminderPlugin.Commands
                 }
             }
 
-            // Parse: "every day at 9am message" or "every week on monday at 2pm message"
-            var fullInput = string.Join(" ", args.Skip(2)); // Skip "serverreminder" and "every"
+            // Rejoin the full command after "serverreminder every"
+            var fullInput = string.Join(" ", args.Skip(2));
+            Console.WriteLine($"[DEBUG] ServerReminder parsing: '{fullInput}'");
+            
             var parseResult = ParseServerReminderInput(fullInput);
 
             if (!parseResult.Success)
@@ -92,279 +94,233 @@ namespace DiscordBot.Plugins.ReminderPlugin.Commands
                  int Interval, List<DayOfWeek>? RecurringDays, int? MonthlyDay, WeekOfMonth? WeekOfMonth,
                  DayOfWeek? WeeklyDayOfWeek, string Error) ParseServerReminderInput(string input)
         {
-            var normalizedInput = input.ToLower().Trim();
+            var lowerInput = input.ToLower().Trim();
 
+            // Determine recurrence type
             RecurrenceType recurrenceType;
-            if (normalizedInput.StartsWith("day"))
+            if (lowerInput.StartsWith("day") || Regex.IsMatch(lowerInput, @"^\d+\s+days?"))
                 recurrenceType = RecurrenceType.Daily;
-            else if (normalizedInput.StartsWith("week"))
+            else if (lowerInput.StartsWith("week") || Regex.IsMatch(lowerInput, @"^\d+\s+weeks?"))
                 recurrenceType = RecurrenceType.Weekly;
-            else if (normalizedInput.StartsWith("month"))
-                recurrenceType = RecurrenceType.Monthly;
-            else if (Regex.IsMatch(normalizedInput, @"^\d+\s+days?"))
-                recurrenceType = RecurrenceType.Daily;
-            else if (Regex.IsMatch(normalizedInput, @"^\d+\s+weeks?"))
-                recurrenceType = RecurrenceType.Weekly;
-            else if (Regex.IsMatch(normalizedInput, @"^\d+\s+months?"))
+            else if (lowerInput.StartsWith("month") || Regex.IsMatch(lowerInput, @"^\d+\s+months?"))
                 recurrenceType = RecurrenceType.Monthly;
             else
                 return (false, null, "", RecurrenceType.None, 0, null, null, null, null,
                        "Must specify 'day', 'week', or 'month'. Example: 'every day at 9am message'");
 
-            return recurrenceType switch
+            // Find "at" position and extract time + message
+            var atIndex = lowerInput.IndexOf(" at ");
+            if (atIndex == -1)
             {
-                RecurrenceType.Daily => ParseDailyReminder(normalizedInput, input),
-                RecurrenceType.Weekly => ParseWeeklyReminder(normalizedInput, input),
-                RecurrenceType.Monthly => ParseMonthlyReminder(normalizedInput, input),
-                _ => (false, null, "", RecurrenceType.None, 0, null, null, null, null, "Unsupported recurrence type.")
-            };
-        }
+                return (false, null, "", RecurrenceType.None, 0, null, null, null, null,
+                       "Missing 'at' keyword. Example: 'every day at 9am message'");
+            }
 
-        private (bool Success, DateTime? FirstTrigger, string Message, RecurrenceType RecurrenceType,
-                 int Interval, List<DayOfWeek>? RecurringDays, int? MonthlyDay, WeekOfMonth? WeekOfMonth,
-                 DayOfWeek? WeeklyDayOfWeek, string Error) ParseDailyReminder(string normalizedInput, string originalInput)
-        {
-            var interval = 1;
-            var intervalMatch = Regex.Match(normalizedInput, @"^(\d+)\s+days?");
+            // Everything after "at " is time + message
+            var afterAt = input.Substring(atIndex + 4).Trim();
+            
+            // Split into time and message
+            var (timeStr, messageStr) = ExtractTimeAndMessage(afterAt);
+            
+            if (string.IsNullOrEmpty(timeStr))
+            {
+                return (false, null, "", RecurrenceType.None, 0, null, null, null, null,
+                       "Could not find time. Example: 'every day at 9am message'");
+            }
+
+            Console.WriteLine($"[DEBUG] Extracted time: '{timeStr}', message: '{messageStr}'");
+
+            // Parse the time
+            var timeParsed = ParseTimeString(timeStr);
+            if (!timeParsed.Success)
+            {
+                return (false, null, "", RecurrenceType.None, 0, null, null, null, null,
+                       $"Could not parse time '{timeStr}'. Use formats like '9am', '2:30pm', or '14:30'.");
+            }
+
+            // Get interval
+            int interval = 1;
+            var intervalMatch = Regex.Match(lowerInput, @"^(\d+)\s+(?:days?|weeks?|months?)");
             if (intervalMatch.Success)
             {
                 interval = int.Parse(intervalMatch.Groups[1].Value);
             }
 
-            // Extract time and message - more flexible regex
-            var atMatch = Regex.Match(originalInput, @"at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+(.+)", RegexOptions.IgnoreCase);
-            if (!atMatch.Success)
-            {
-                // Try alternative pattern for 24-hour format
-                atMatch = Regex.Match(originalInput, @"at\s+(\d{1,2}:\d{2})\s+(.+)", RegexOptions.IgnoreCase);
-            }
-            if (!atMatch.Success)
-            {
-                return (false, null, "", RecurrenceType.Daily, 0, null, null, null, null,
-                       "Could not parse time. Use format: 'every day at 9am message' or 'every day at 14:30 message'");
-            }
-
-            var timeStr = atMatch.Groups[1].Value.Trim();
-            var message = atMatch.Groups[2].Value.Trim();
-
-            // Parse time manually for better control
-            var timeParsed = ParseTimeString(timeStr);
-            if (!timeParsed.Success)
-            {
-                return (false, null, "", RecurrenceType.Daily, 0, null, null, null, null,
-                       $"Could not parse time '{timeStr}'. Use formats like '9am', '2:30pm', or '14:30'.");
-            }
-
+            // Calculate first trigger
             var firstTrigger = DateTime.Today.Add(timeParsed.Time!.Value);
             if (firstTrigger <= DateTime.Now)
             {
                 firstTrigger = firstTrigger.AddDays(1);
             }
 
-            return (true, firstTrigger, message, RecurrenceType.Daily, interval, null, null, null, null, "");
+            // For weekly, parse days
+            List<DayOfWeek>? recurringDays = null;
+            if (recurrenceType == RecurrenceType.Weekly)
+            {
+                recurringDays = ParseWeekDays(lowerInput);
+                if (recurringDays.Any())
+                {
+                    var targetDay = recurringDays.First();
+                    var daysUntil = ((int)targetDay - (int)DateTime.Now.DayOfWeek + 7) % 7;
+                    if (daysUntil == 0 && firstTrigger.TimeOfDay <= DateTime.Now.TimeOfDay)
+                        daysUntil = 7;
+                    firstTrigger = DateTime.Today.AddDays(daysUntil).Add(timeParsed.Time!.Value);
+                }
+            }
+
+            // For monthly, parse day specification
+            int? monthlyDay = null;
+            WeekOfMonth? weekOfMonth = null;
+            DayOfWeek? weeklyDayOfWeek = null;
+            if (recurrenceType == RecurrenceType.Monthly)
+            {
+                (monthlyDay, weekOfMonth, weeklyDayOfWeek) = ParseMonthlySpec(lowerInput);
+                firstTrigger = CalculateFirstMonthlyTrigger(DateTime.Now, timeParsed.Time!.Value, monthlyDay, weekOfMonth, weeklyDayOfWeek);
+            }
+
+            var finalMessage = string.IsNullOrWhiteSpace(messageStr) ? "Server Reminder" : messageStr;
+
+            return (true, firstTrigger, finalMessage, recurrenceType, interval, recurringDays, monthlyDay, weekOfMonth, weeklyDayOfWeek, "");
+        }
+
+        private (string TimeStr, string Message) ExtractTimeAndMessage(string input)
+        {
+            // Try to match common time patterns at the start
+            var patterns = new[]
+            {
+                @"^(\d{1,2}:\d{2}\s*(?:am|pm))\s+(.*)$",   // 2:30pm message
+                @"^(\d{1,2}\s*(?:am|pm))\s+(.*)$",          // 2pm message
+                @"^(\d{1,2}:\d{2})\s+(.*)$",                // 14:30 message
+                @"^(\d{1,2})\s+(.*)$"                       // 14 message (hour only)
+            };
+
+            foreach (var pattern in patterns)
+            {
+                var match = Regex.Match(input, pattern, RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    return (match.Groups[1].Value.Trim(), match.Groups[2].Value.Trim());
+                }
+            }
+
+            // Fallback: take first word as time
+            var parts = input.Split(' ', 2);
+            return (parts[0], parts.Length > 1 ? parts[1] : "");
         }
 
         private (bool Success, TimeSpan? Time) ParseTimeString(string timeStr)
         {
-            timeStr = timeStr.Trim().ToLower();
+            timeStr = timeStr.Trim().ToLower().Replace(" ", "");
             
-            // Try 12-hour format: 2pm, 2:30pm, 2:30 pm
-            var match12 = Regex.Match(timeStr, @"^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$", RegexOptions.IgnoreCase);
+            Console.WriteLine($"[DEBUG] ParseTimeString input: '{timeStr}'");
+
+            // 12-hour format: 2pm, 2:30pm
+            var match12 = Regex.Match(timeStr, @"^(\d{1,2})(?::(\d{2}))?(am|pm)$", RegexOptions.IgnoreCase);
             if (match12.Success)
             {
                 int hour = int.Parse(match12.Groups[1].Value);
-                int minute = match12.Groups[2].Success ? int.Parse(match12.Groups[2].Value) : 0;
+                int minute = match12.Groups[2].Success && !string.IsNullOrEmpty(match12.Groups[2].Value) 
+                    ? int.Parse(match12.Groups[2].Value) : 0;
                 bool isPm = match12.Groups[3].Value.ToLower() == "pm";
                 
                 if (hour == 12) hour = 0;
                 if (isPm) hour += 12;
                 
+                Console.WriteLine($"[DEBUG] 12-hour parsed: hour={hour}, minute={minute}");
+                
                 if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60)
                     return (true, new TimeSpan(hour, minute, 0));
             }
             
-            // Try 24-hour format: 14:30, 9:00
+            // 24-hour format: 14:30
             var match24 = Regex.Match(timeStr, @"^(\d{1,2}):(\d{2})$");
             if (match24.Success)
             {
                 int hour = int.Parse(match24.Groups[1].Value);
                 int minute = int.Parse(match24.Groups[2].Value);
                 
+                Console.WriteLine($"[DEBUG] 24-hour parsed: hour={hour}, minute={minute}");
+                
                 if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60)
                     return (true, new TimeSpan(hour, minute, 0));
             }
             
-            // Try hour only: 9, 14
+            // Hour only: 9, 14
             if (int.TryParse(timeStr, out int hourOnly) && hourOnly >= 0 && hourOnly < 24)
             {
+                Console.WriteLine($"[DEBUG] Hour-only parsed: hour={hourOnly}");
                 return (true, new TimeSpan(hourOnly, 0, 0));
             }
             
+            Console.WriteLine($"[DEBUG] Failed to parse time: '{timeStr}'");
             return (false, null);
         }
 
-        private (bool Success, DateTime? FirstTrigger, string Message, RecurrenceType RecurrenceType,
-                 int Interval, List<DayOfWeek>? RecurringDays, int? MonthlyDay, WeekOfMonth? WeekOfMonth,
-                 DayOfWeek? WeeklyDayOfWeek, string Error) ParseWeeklyReminder(string normalizedInput, string originalInput)
+        private List<DayOfWeek> ParseWeekDays(string input)
         {
-            var interval = 1;
-            var intervalMatch = Regex.Match(normalizedInput, @"^(\d+)\s+weeks?");
-            if (intervalMatch.Success)
-            {
-                interval = int.Parse(intervalMatch.Groups[1].Value);
-            }
-
-            // Parse days
-            var recurringDays = new List<DayOfWeek>();
-            var dayNames = new Dictionary<string, DayOfWeek>
+            var days = new List<DayOfWeek>();
+            var dayMap = new Dictionary<string, DayOfWeek>
             {
                 {"sunday", DayOfWeek.Sunday}, {"sun", DayOfWeek.Sunday},
                 {"monday", DayOfWeek.Monday}, {"mon", DayOfWeek.Monday},
-                {"tuesday", DayOfWeek.Tuesday}, {"tue", DayOfWeek.Tuesday},
+                {"tuesday", DayOfWeek.Tuesday}, {"tue", DayOfWeek.Tuesday}, {"tues", DayOfWeek.Tuesday},
                 {"wednesday", DayOfWeek.Wednesday}, {"wed", DayOfWeek.Wednesday},
-                {"thursday", DayOfWeek.Thursday}, {"thu", DayOfWeek.Thursday},
+                {"thursday", DayOfWeek.Thursday}, {"thu", DayOfWeek.Thursday}, {"thurs", DayOfWeek.Thursday},
                 {"friday", DayOfWeek.Friday}, {"fri", DayOfWeek.Friday},
                 {"saturday", DayOfWeek.Saturday}, {"sat", DayOfWeek.Saturday}
             };
 
-            var onMatch = Regex.Match(normalizedInput, @"on\s+(.+?)\s+at");
-            if (onMatch.Success)
+            foreach (var kvp in dayMap)
             {
-                var daysPart = onMatch.Groups[1].Value;
-                foreach (var day in dayNames)
+                if (input.Contains(kvp.Key) && !days.Contains(kvp.Value))
                 {
-                    if (daysPart.Contains(day.Key) && !recurringDays.Contains(day.Value))
-                    {
-                        recurringDays.Add(day.Value);
-                    }
+                    days.Add(kvp.Value);
                 }
             }
 
-            if (!recurringDays.Any())
+            if (!days.Any())
             {
-                recurringDays.Add(DateTime.Now.DayOfWeek);
+                days.Add(DateTime.Now.DayOfWeek);
             }
 
-            // Extract time and message
-            var atMatch = Regex.Match(originalInput, @"at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+(.+)", RegexOptions.IgnoreCase);
-            if (!atMatch.Success)
-            {
-                return (false, null, "", RecurrenceType.Weekly, 0, null, null, null, null,
-                       "Could not parse time. Use format: 'every week on monday at 9am message'");
-            }
-
-            var timeStr = atMatch.Groups[1].Value.Trim();
-            var message = atMatch.Groups[2].Value.Trim();
-
-            var timeResult = TimeParser.ParseTime($"today at {timeStr}");
-            if (!timeResult.Success)
-            {
-                return (false, null, "", RecurrenceType.Weekly, 0, null, null, null, null,
-                       $"Could not parse time '{timeStr}'.");
-            }
-
-            var targetTime = timeResult.DateTime!.Value.TimeOfDay;
-            var firstDay = recurringDays.OrderBy(d => d).First();
-            var today = DateTime.Now;
-            var daysUntilFirst = ((int)firstDay - (int)today.DayOfWeek + 7) % 7;
-
-            var firstTrigger = today.Date.AddDays(daysUntilFirst).Add(targetTime);
-            if (daysUntilFirst == 0 && firstTrigger <= DateTime.Now)
-            {
-                firstTrigger = firstTrigger.AddDays(7);
-            }
-
-            return (true, firstTrigger, message, RecurrenceType.Weekly, interval, recurringDays, null, null, null, "");
+            return days;
         }
 
-        private (bool Success, DateTime? FirstTrigger, string Message, RecurrenceType RecurrenceType,
-                 int Interval, List<DayOfWeek>? RecurringDays, int? MonthlyDay, WeekOfMonth? WeekOfMonth,
-                 DayOfWeek? WeeklyDayOfWeek, string Error) ParseMonthlyReminder(string normalizedInput, string originalInput)
+        private (int? MonthlyDay, WeekOfMonth? WeekOfMonth, DayOfWeek? WeeklyDayOfWeek) ParseMonthlySpec(string input)
         {
-            var interval = 1;
-            var intervalMatch = Regex.Match(normalizedInput, @"^(\d+)\s+months?");
-            if (intervalMatch.Success)
+            if (input.Contains("last day"))
+                return (-1, null, null);
+
+            var dayMatch = Regex.Match(input, @"on\s+(?:the\s+)?(\d+)");
+            if (dayMatch.Success)
+                return (int.Parse(dayMatch.Groups[1].Value), null, null);
+
+            var weekDayMatch = Regex.Match(input, @"(first|second|third|fourth|last)\s+(sun|mon|tue|wed|thu|fri|sat)\w*");
+            if (weekDayMatch.Success)
             {
-                interval = int.Parse(intervalMatch.Groups[1].Value);
-            }
-
-            int? monthlyDay = null;
-            WeekOfMonth? weekOfMonth = null;
-            DayOfWeek? weeklyDayOfWeek = null;
-
-            // Parse "on the 15th" or "on the first monday"
-            var onMatch = Regex.Match(normalizedInput, @"on\s+(?:the\s+)?(.+?)\s+at");
-            if (onMatch.Success)
-            {
-                var daySpec = onMatch.Groups[1].Value.Trim();
-
-                if (daySpec.Contains("last day"))
+                var week = weekDayMatch.Groups[1].Value switch
                 {
-                    monthlyDay = -1;
-                }
-                else if (Regex.IsMatch(daySpec, @"^\d+"))
+                    "first" => WeekOfMonth.First,
+                    "second" => WeekOfMonth.Second,
+                    "third" => WeekOfMonth.Third,
+                    "fourth" => WeekOfMonth.Fourth,
+                    "last" => WeekOfMonth.Last,
+                    _ => WeekOfMonth.First
+                };
+
+                var dayMap = new Dictionary<string, DayOfWeek>
                 {
-                    var dayNum = Regex.Match(daySpec, @"^(\d+)");
-                    if (dayNum.Success) monthlyDay = int.Parse(dayNum.Groups[1].Value);
-                }
-                else
-                {
-                    var weekDayMatch = Regex.Match(daySpec, @"(first|second|third|fourth|last)\s+(\w+)");
-                    if (weekDayMatch.Success)
-                    {
-                        weekOfMonth = weekDayMatch.Groups[1].Value.ToLower() switch
-                        {
-                            "first" => WeekOfMonth.First,
-                            "second" => WeekOfMonth.Second,
-                            "third" => WeekOfMonth.Third,
-                            "fourth" => WeekOfMonth.Fourth,
-                            "last" => WeekOfMonth.Last,
-                            _ => null
-                        };
+                    {"sun", DayOfWeek.Sunday}, {"mon", DayOfWeek.Monday}, {"tue", DayOfWeek.Tuesday},
+                    {"wed", DayOfWeek.Wednesday}, {"thu", DayOfWeek.Thursday}, {"fri", DayOfWeek.Friday},
+                    {"sat", DayOfWeek.Saturday}
+                };
 
-                        var dayNames = new Dictionary<string, DayOfWeek>
-                        {
-                            {"sunday", DayOfWeek.Sunday}, {"monday", DayOfWeek.Monday},
-                            {"tuesday", DayOfWeek.Tuesday}, {"wednesday", DayOfWeek.Wednesday},
-                            {"thursday", DayOfWeek.Thursday}, {"friday", DayOfWeek.Friday},
-                            {"saturday", DayOfWeek.Saturday}
-                        };
-
-                        if (dayNames.TryGetValue(weekDayMatch.Groups[2].Value.ToLower(), out var dow))
-                        {
-                            weeklyDayOfWeek = dow;
-                        }
-                    }
-                }
+                var dayPrefix = weekDayMatch.Groups[2].Value;
+                if (dayMap.TryGetValue(dayPrefix, out var dow))
+                    return (null, week, dow);
             }
 
-            if (!monthlyDay.HasValue && !weekOfMonth.HasValue)
-            {
-                monthlyDay = 1;
-            }
-
-            // Extract time and message
-            var atMatch = Regex.Match(originalInput, @"at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+(.+)", RegexOptions.IgnoreCase);
-            if (!atMatch.Success)
-            {
-                return (false, null, "", RecurrenceType.Monthly, 0, null, null, null, null,
-                       "Could not parse time. Use format: 'every month on the 15th at 9am message'");
-            }
-
-            var timeStr = atMatch.Groups[1].Value.Trim();
-            var message = atMatch.Groups[2].Value.Trim();
-
-            var timeResult = TimeParser.ParseTime($"today at {timeStr}");
-            if (!timeResult.Success)
-            {
-                return (false, null, "", RecurrenceType.Monthly, 0, null, null, null, null,
-                       $"Could not parse time '{timeStr}'.");
-            }
-
-            var targetTime = timeResult.DateTime!.Value.TimeOfDay;
-            var firstTrigger = CalculateFirstMonthlyTrigger(DateTime.Now, targetTime, monthlyDay, weekOfMonth, weeklyDayOfWeek);
-
-            return (true, firstTrigger, message, RecurrenceType.Monthly, interval, null, monthlyDay, weekOfMonth, weeklyDayOfWeek, "");
+            return (1, null, null); // Default to 1st of month
         }
 
         private DateTime CalculateFirstMonthlyTrigger(DateTime now, TimeSpan targetTime, int? monthlyDay, WeekOfMonth? weekOfMonth, DayOfWeek? weeklyDayOfWeek)

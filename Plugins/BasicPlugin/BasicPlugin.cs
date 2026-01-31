@@ -9,6 +9,8 @@ namespace DiscordBot.Plugins.BasicPlugin
     {
         public string Name => "Basic Commands";
         public string Description => "Provides basic bot functionality";
+        
+        public const string Version = "1.1";
 
         private readonly ConfigurationService _configService;
         private DiscordSocketClient _client = null!;
@@ -67,6 +69,10 @@ namespace DiscordBot.Plugins.BasicPlugin
                     case "info":
                         await SendServerInfo(message);
                         return true;
+
+                    case "version":
+                        await message.Channel.SendMessageAsync($"Bot v{Version}");
+                        return true;Peeb 
                 }
             }
 
@@ -76,7 +82,7 @@ namespace DiscordBot.Plugins.BasicPlugin
         private async Task SendHelpMessage(SocketMessage message)
         {
             var embed = new EmbedBuilder()
-                .WithTitle("🤖 Peeb Bot Commands")
+                .WithTitle($"🤖 Peeb Bot Commands (v{Version})")
                 .WithDescription("Here are all the available commands:")
                 .WithColor(Color.Blue)
                 .WithCurrentTimestamp();
@@ -86,6 +92,7 @@ namespace DiscordBot.Plugins.BasicPlugin
                 $"`{_configService.CommandPrefix}ping` - Check if bot is responsive\n" +
                 $"`{_configService.CommandPrefix}hello` - Say hello\n" +
                 $"`{_configService.CommandPrefix}info` - Get server information\n" +
+                $"`{_configService.CommandPrefix}version` - Show bot version\n" +
                 $"`{_configService.CommandPrefix}help` - Show this help message", false);
 
             // Reaction Commands
@@ -116,6 +123,12 @@ namespace DiscordBot.Plugins.BasicPlugin
                 $"`{_configService.CommandPrefix}every month [on day] [at time] [message]` - Monthly reminders\n" +
                 $"`{_configService.CommandPrefix}every [N] days/weeks/months` - Custom intervals", false);
 
+            // Server Reminder Commands
+            embed.AddField("**📢 Server Reminders**",
+                $"`{_configService.CommandPrefix}serverreminder every day at [time] [message]` - Daily server announcement\n" +
+                $"`{_configService.CommandPrefix}serverreminder every week on [day] at [time] [message]` - Weekly\n" +
+                "Attach an image to include it in the reminder!", false);
+
             // One-Time Examples
             embed.AddField("**📝 One-Time Examples**",
                 $"`{_configService.CommandPrefix}remindme in 2 hours take a break`\n" +
@@ -128,9 +141,7 @@ namespace DiscordBot.Plugins.BasicPlugin
                 $"`{_configService.CommandPrefix}every day at 9am take vitamins`\n" +
                 $"`{_configService.CommandPrefix}every week on monday at 2pm team meeting`\n" +
                 $"`{_configService.CommandPrefix}every month on the 15th pay bills`\n" +
-                $"`{_configService.CommandPrefix}every 2 weeks on tuesday and friday standup`\n" +
-                $"`{_configService.CommandPrefix}every month on the first monday review goals`\n" +
-                $"`{_configService.CommandPrefix}every month on the last day reports`", false);
+                $"`{_configService.CommandPrefix}serverreminder every day at 5pm Check in!`", false);
 
             embed.WithFooter("💡 You can also just type reaction names (like 'thanks' or 'haha') to use saved reactions!");
 
