@@ -131,31 +131,76 @@ namespace DiscordBot.Plugins.ReminderPlugin.Commands
                 interval = int.Parse(intervalMatch.Groups[1].Value);
             }
 
-            // Extract time and message
+            // Extract time and message - more flexible regex
             var atMatch = Regex.Match(originalInput, @"at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\s+(.+)", RegexOptions.IgnoreCase);
             if (!atMatch.Success)
             {
+                // Try alternative pattern for 24-hour format
+                atMatch = Regex.Match(originalInput, @"at\s+(\d{1,2}:\d{2})\s+(.+)", RegexOptions.IgnoreCase);
+            }
+            if (!atMatch.Success)
+            {
                 return (false, null, "", RecurrenceType.Daily, 0, null, null, null, null,
-                       "Could not parse time. Use format: 'every day at 9am message'");
+                       "Could not parse time. Use format: 'every day at 9am message' or 'every day at 14:30 message'");
             }
 
             var timeStr = atMatch.Groups[1].Value.Trim();
             var message = atMatch.Groups[2].Value.Trim();
 
-            var timeResult = TimeParser.ParseTime($"today at {timeStr}");
-            if (!timeResult.Success)
+            // Parse time manually for better control
+            var timeParsed = ParseTimeString(timeStr);
+            if (!timeParsed.Success)
             {
                 return (false, null, "", RecurrenceType.Daily, 0, null, null, null, null,
-                       $"Could not parse time '{timeStr}'.");
+                       $"Could not parse time '{timeStr}'. Use formats like '9am', '2:30pm', or '14:30'.");
             }
 
-            var firstTrigger = timeResult.DateTime!.Value;
+            var firstTrigger = DateTime.Today.Add(timeParsed.Time!.Value);
             if (firstTrigger <= DateTime.Now)
             {
                 firstTrigger = firstTrigger.AddDays(1);
             }
 
             return (true, firstTrigger, message, RecurrenceType.Daily, interval, null, null, null, null, "");
+        }
+
+        private (bool Success, TimeSpan? Time) ParseTimeString(string timeStr)
+        {
+            timeStr = timeStr.Trim().ToLower();
+            
+            // Try 12-hour format: 2pm, 2:30pm, 2:30 pm
+            var match12 = Regex.Match(timeStr, @"^(\d{1,2})(?::(\d{2}))?\s*(am|pm)$", RegexOptions.IgnoreCase);
+            if (match12.Success)
+            {
+                int hour = int.Parse(match12.Groups[1].Value);
+                int minute = match12.Groups[2].Success ? int.Parse(match12.Groups[2].Value) : 0;
+                bool isPm = match12.Groups[3].Value.ToLower() == "pm";
+                
+                if (hour == 12) hour = 0;
+                if (isPm) hour += 12;
+                
+                if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60)
+                    return (true, new TimeSpan(hour, minute, 0));
+            }
+            
+            // Try 24-hour format: 14:30, 9:00
+            var match24 = Regex.Match(timeStr, @"^(\d{1,2}):(\d{2})$");
+            if (match24.Success)
+            {
+                int hour = int.Parse(match24.Groups[1].Value);
+                int minute = int.Parse(match24.Groups[2].Value);
+                
+                if (hour >= 0 && hour < 24 && minute >= 0 && minute < 60)
+                    return (true, new TimeSpan(hour, minute, 0));
+            }
+            
+            // Try hour only: 9, 14
+            if (int.TryParse(timeStr, out int hourOnly) && hourOnly >= 0 && hourOnly < 24)
+            {
+                return (true, new TimeSpan(hourOnly, 0, 0));
+            }
+            
+            return (false, null);
         }
 
         private (bool Success, DateTime? FirstTrigger, string Message, RecurrenceType RecurrenceType,
