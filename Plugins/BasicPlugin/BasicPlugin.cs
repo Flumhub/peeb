@@ -72,7 +72,7 @@ namespace DiscordBot.Plugins.BasicPlugin
 
                     case "version":
                         await message.Channel.SendMessageAsync($"Bot v{Version}");
-                        return true;Peeb 
+                        return true;
                 }
             }
 
