@@ -173,5 +173,8 @@ namespace DiscordBot.Plugins.BasicPlugin
         public Task CleanupAsync() => Task.CompletedTask;
     }
 }
+<<<<<<< HEAD
 
 // Test comment for change
+=======
+>>>>>>> dcbe1580fba8005f244bee0d9645b3ef16051a48
