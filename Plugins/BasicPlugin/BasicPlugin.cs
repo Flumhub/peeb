@@ -72,7 +72,7 @@ namespace DiscordBot.Plugins.BasicPlugin
 
                     case "version":
                         await message.Channel.SendMessageAsync($"Bot v{Version}");
-                        return true;Peeb 
+                        return true;
                 }
             }
 
@@ -173,3 +173,5 @@ namespace DiscordBot.Plugins.BasicPlugin
         public Task CleanupAsync() => Task.CompletedTask;
     }
 }
+
+// Test comment for change

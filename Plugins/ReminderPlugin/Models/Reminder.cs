@@ -56,3 +56,5 @@ namespace DiscordBot.Plugins.ReminderPlugin.Models
         public List<Reminder> Reminders { get; set; } = new();
     }
 }
+
+//Reminder test
