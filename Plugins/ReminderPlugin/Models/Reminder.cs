@@ -28,6 +28,10 @@ namespace DiscordBot.Plugins.ReminderPlugin.Models
         // For monthly reminders - which week and day (e.g., "first Monday", "last Friday")
         public WeekOfMonth? WeekOfMonth { get; set; }
         public DayOfWeek? WeeklyDayOfWeek { get; set; }
+
+        // Server reminder properties (no ping, rich embed)
+        public bool IsServerReminder { get; set; } = false;
+        public string? ImageUrl { get; set; }
     }
 
     public enum RecurrenceType

@@ -93,6 +93,40 @@ namespace DiscordBot.Plugins.ReminderPlugin.Services
             return $"✅ Recurring reminder set! {recurrenceDescription} Starting {firstTrigger:MMM dd, yyyy 'at' h:mm tt}";
         }
 
+        public async Task<string> AddServerReminderAsync(ulong userId, ulong channelId, ulong guildId,
+            DateTime firstTrigger, string message, RecurrenceType recurrenceType, int interval = 1,
+            List<DayOfWeek>? recurringDays = null, int? monthlyDay = null,
+            WeekOfMonth? weekOfMonth = null, DayOfWeek? weeklyDayOfWeek = null,
+            string? imageUrl = null)
+        {
+            var reminder = new Reminder
+            {
+                Id = Guid.NewGuid().ToString(),
+                UserId = userId,
+                ChannelId = channelId,
+                GuildId = guildId,
+                TriggerTime = firstTrigger,
+                Message = message,
+                CreatedAt = DateTime.Now,
+                IsTriggered = false,
+                IsRecurring = true,
+                IsServerReminder = true,
+                ImageUrl = imageUrl,
+                RecurrenceType = recurrenceType,
+                RecurrenceInterval = interval,
+                RecurrenceDays = recurringDays ?? new List<DayOfWeek>(),
+                MonthlyDay = monthlyDay,
+                WeekOfMonth = weekOfMonth,
+                WeeklyDayOfWeek = weeklyDayOfWeek
+            };
+
+            _reminderData.Reminders.Add(reminder);
+            await SaveRemindersAsync();
+
+            string recurrenceDescription = FormatRecurrenceDescription(reminder);
+            return $"📢 Server reminder set! {recurrenceDescription} Starting {firstTrigger:MMM dd, yyyy 'at' h:mm tt}";
+        }
+
         public async Task<List<Reminder>> GetUserRemindersAsync(ulong userId)
         {
             return _reminderData.Reminders
@@ -284,44 +318,94 @@ namespace DiscordBot.Plugins.ReminderPlugin.Services
                 var channel = guild?.GetTextChannel(reminder.ChannelId);
                 var user = guild?.GetUser(reminder.UserId);
 
-                if (channel != null && user != null)
+                if (channel != null)
                 {
-                    var embed = new Discord.EmbedBuilder()
-                        .WithTitle(reminder.IsRecurring ? "🔄 Recurring Reminder!" : "⏰ Reminder!")
-                        .WithDescription(reminder.Message)
-                        .WithColor(reminder.IsRecurring ? Discord.Color.Blue : Discord.Color.Orange)
-                        .WithFooter($"Set on {reminder.CreatedAt:MMM dd, yyyy 'at' h:mm tt}" + 
-                                   (reminder.IsRecurring ? $" • Trigger #{reminder.TriggerCount + 1}" : ""))
-                        .WithCurrentTimestamp();
-
-                    if (reminder.IsRecurring)
+                    if (reminder.IsServerReminder)
                     {
-                        var nextTrigger = CalculateNextTriggerTime(reminder);
-                        if (nextTrigger.HasValue && 
-                            (reminder.RecurrenceEndDate == null || nextTrigger <= reminder.RecurrenceEndDate) &&
-                            (reminder.MaxTriggers == null || reminder.TriggerCount + 1 < reminder.MaxTriggers))
-                        {
-                            embed.AddField("Next Reminder", 
-                                         $"{nextTrigger:MMM dd, yyyy 'at' h:mm tt}", true);
-                        }
-                        else
-                        {
-                            embed.AddField("Status", "This was the final reminder", true);
-                        }
+                        // Server reminder - rich embed, no ping
+                        await SendServerReminderAsync(channel, reminder);
                     }
-
-                    await channel.SendMessageAsync($"{user.Mention}", embed: embed.Build());
-                    Console.WriteLine($"[DEBUG] Triggered {(reminder.IsRecurring ? "recurring " : "")}reminder for {user.Username}: {reminder.Message}");
+                    else if (user != null)
+                    {
+                        // Personal reminder - ping user
+                        await SendPersonalReminderAsync(channel, user, reminder);
+                    }
+                    else
+                    {
+                        Console.WriteLine($"[WARNING] Could not find user for reminder {reminder.Id}");
+                    }
                 }
                 else
                 {
-                    Console.WriteLine($"[WARNING] Could not find channel or user for reminder {reminder.Id}");
+                    Console.WriteLine($"[WARNING] Could not find channel for reminder {reminder.Id}");
                 }
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[ERROR] Failed to trigger reminder {reminder.Id}: {ex.Message}");
             }
+        }
+
+        private async Task SendServerReminderAsync(Discord.WebSocket.SocketTextChannel channel, Reminder reminder)
+        {
+            var embed = new Discord.EmbedBuilder()
+                .WithTitle("📢 " + reminder.Message)
+                .WithColor(new Discord.Color(88, 101, 242)) // Discord blurple
+                .WithCurrentTimestamp();
+
+            // Add image if provided
+            if (!string.IsNullOrEmpty(reminder.ImageUrl))
+            {
+                embed.WithImageUrl(reminder.ImageUrl);
+            }
+
+            // Add footer with recurrence info
+            var recurrenceInfo = GetRecurrenceInfo(reminder);
+            embed.WithFooter($"{recurrenceInfo} • Next: {CalculateNextTriggerTime(reminder):MMM dd 'at' h:mm tt}");
+
+            await channel.SendMessageAsync(embed: embed.Build());
+            Console.WriteLine($"[DEBUG] Triggered server reminder: {reminder.Message}");
+        }
+
+        private async Task SendPersonalReminderAsync(Discord.WebSocket.SocketTextChannel channel, Discord.WebSocket.SocketGuildUser user, Reminder reminder)
+        {
+            var embed = new Discord.EmbedBuilder()
+                .WithTitle(reminder.IsRecurring ? "🔄 Recurring Reminder!" : "⏰ Reminder!")
+                .WithDescription(reminder.Message)
+                .WithColor(reminder.IsRecurring ? Discord.Color.Blue : Discord.Color.Orange)
+                .WithFooter($"Set on {reminder.CreatedAt:MMM dd, yyyy 'at' h:mm tt}" + 
+                           (reminder.IsRecurring ? $" • Trigger #{reminder.TriggerCount + 1}" : ""))
+                .WithCurrentTimestamp();
+
+            if (reminder.IsRecurring)
+            {
+                var nextTrigger = CalculateNextTriggerTime(reminder);
+                if (nextTrigger.HasValue && 
+                    (reminder.RecurrenceEndDate == null || nextTrigger <= reminder.RecurrenceEndDate) &&
+                    (reminder.MaxTriggers == null || reminder.TriggerCount + 1 < reminder.MaxTriggers))
+                {
+                    embed.AddField("Next Reminder", 
+                                 $"{nextTrigger:MMM dd, yyyy 'at' h:mm tt}", true);
+                }
+                else
+                {
+                    embed.AddField("Status", "This was the final reminder", true);
+                }
+            }
+
+            await channel.SendMessageAsync($"{user.Mention}", embed: embed.Build());
+            Console.WriteLine($"[DEBUG] Triggered {(reminder.IsRecurring ? "recurring " : "")}reminder for {user.Username}: {reminder.Message}");
+        }
+
+        private string GetRecurrenceInfo(Reminder reminder)
+        {
+            return reminder.RecurrenceType switch
+            {
+                RecurrenceType.Daily => reminder.RecurrenceInterval == 1 ? "Daily" : $"Every {reminder.RecurrenceInterval} days",
+                RecurrenceType.Weekly => reminder.RecurrenceInterval == 1 ? "Weekly" : $"Every {reminder.RecurrenceInterval} weeks",
+                RecurrenceType.Monthly => reminder.RecurrenceInterval == 1 ? "Monthly" : $"Every {reminder.RecurrenceInterval} months",
+                _ => ""
+            };
         }
 
         private string FormatRecurrenceDescription(Reminder reminder)

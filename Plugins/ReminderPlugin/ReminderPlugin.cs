@@ -29,10 +29,11 @@ namespace DiscordBot.Plugins.ReminderPlugin
             // Register commands
             _commands.Add(new RemindMeCommand(_reminderService));
             _commands.Add(new EveryReminderCommand(_reminderService));
+            _commands.Add(new ServerReminderCommand(_reminderService));
             _commands.Add(new MyRemindersCommand(_reminderService));
             _commands.Add(new CancelReminderCommand(_reminderService));
 
-            Console.WriteLine($"[DEBUG] Reminder plugin initialized with recurring functionality");
+            Console.WriteLine($"[DEBUG] Reminder plugin initialized with recurring and server reminder functionality");
         }
 
         public async Task<bool> HandleMessageAsync(SocketMessage message)
