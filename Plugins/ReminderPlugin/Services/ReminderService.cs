@@ -354,12 +354,37 @@ namespace DiscordBot.Plugins.ReminderPlugin.Services
 
         private async Task SendServerReminderAsync(Discord.WebSocket.SocketTextChannel channel, Reminder reminder)
         {
+            // Parse markdown link format: [text](url)
+            var linkMatch = System.Text.RegularExpressions.Regex.Match(reminder.Message, @"\[([^\]]+)\]\(([^)]+)\)");
+            
             var embed = new Discord.EmbedBuilder()
-                .WithTitle("📢 " + reminder.Message)
-                .WithColor(new Discord.Color(88, 101, 242)) // Discord blurple
-                .WithCurrentTimestamp();
+                .WithColor(new Discord.Color(88, 101, 242)); // Discord blurple
 
-            // Add image if provided
+            if (linkMatch.Success)
+            {
+                // Has a markdown link - use title as clickable link
+                var linkText = linkMatch.Groups[1].Value;
+                var linkUrl = linkMatch.Groups[2].Value;
+                
+                embed.WithTitle(linkText);
+                embed.WithUrl(linkUrl);
+                
+                // If there's text before/after the link, add as description
+                var beforeLink = reminder.Message.Substring(0, linkMatch.Index).Trim();
+                var afterLink = reminder.Message.Substring(linkMatch.Index + linkMatch.Length).Trim();
+                var description = $"{beforeLink} {afterLink}".Trim();
+                if (!string.IsNullOrEmpty(description))
+                {
+                    embed.WithDescription(description);
+                }
+            }
+            else
+            {
+                // No link - just use message as title
+                embed.WithTitle(reminder.Message);
+            }
+
+            // Add image if provided - this will be clickable with the title link
             if (!string.IsNullOrEmpty(reminder.ImageUrl))
             {
                 embed.WithImageUrl(reminder.ImageUrl);
