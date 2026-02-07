@@ -41,21 +41,24 @@ namespace DiscordBot.Plugins.ReminderPlugin
         {
             if (message.Author.IsBot) return false;
 
-            string content = message.Content.ToLower().Trim();
+            string content = message.Content.Trim();
+            string contentLower = content.ToLower();
             string prefix = _configService.CommandPrefix.ToLower();
 
             // Handle commands
-            if (content.StartsWith(prefix))
+            if (contentLower.StartsWith(prefix))
             {
+                // Use original content (preserves case) but skip the prefix
                 string commandText = content.Substring(prefix.Length);
+                string commandTextLower = commandText.ToLower();
                 string[] parts = commandText.Split(' ', StringSplitOptions.RemoveEmptyEntries);
                 
                 if (parts.Length == 0) return false;
 
-                string commandName = parts[0];
+                string commandName = parts[0].ToLower();
 
                 // Handle "remind me" as two words
-                if (commandName == "remind" && parts.Length > 1 && parts[1] == "me")
+                if (commandName == "remind" && parts.Length > 1 && parts[1].ToLower() == "me")
                 {
                     // Reconstruct the args as if it was "remindme"
                     var newParts = new string[parts.Length - 1];
@@ -72,7 +75,7 @@ namespace DiscordBot.Plugins.ReminderPlugin
                 // Handle normal commands
                 foreach (var command in _commands)
                 {
-                    if (commandName == command.Command || commandText.StartsWith(command.Command + " "))
+                    if (commandName == command.Command || commandTextLower.StartsWith(command.Command + " "))
                     {
                         return await command.HandleAsync(message, parts);
                     }
