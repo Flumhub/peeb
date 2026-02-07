@@ -28,17 +28,22 @@ jobs:
           BACKUP_DIR="/opt/peeb/backup_$(date +%Y%m%d_%H%M%S)"
           mkdir -p "$BACKUP_DIR"
           
-          # Backup config files if they exist
+          # Backup all config and data files
           [ -f "aliases.json" ] && cp aliases.json "$BACKUP_DIR/"
           [ -f "reactions.json" ] && cp reactions.json "$BACKUP_DIR/"
           [ -f "reminders.json" ] && cp reminders.json "$BACKUP_DIR/"
           [ -f "appsettings.json" ] && cp appsettings.json "$BACKUP_DIR/"
           
-          # Also create quick restore copies
-          [ -f "aliases.json" ] && cp aliases.json aliases.json.restore
-          [ -f "reactions.json" ] && cp reactions.json reactions.json.restore
-          [ -f "reminders.json" ] && cp reminders.json reminders.json.restore
-          [ -f "appsettings.json" ] && cp appsettings.json appsettings.json.restore
+          # Backup reactions folder
+          [ -d "reactions" ] && cp -r reactions "$BACKUP_DIR/"
+          
+          # Save config files to temp location OUTSIDE the repo
+          mkdir -p /tmp/peeb_backup
+          [ -f "aliases.json" ] && cp aliases.json /tmp/peeb_backup/
+          [ -f "reactions.json" ] && cp reactions.json /tmp/peeb_backup/
+          [ -f "reminders.json" ] && cp reminders.json /tmp/peeb_backup/
+          [ -f "appsettings.json" ] && cp appsettings.json /tmp/peeb_backup/
+          [ -d "reactions" ] && cp -r reactions /tmp/peeb_backup/
           
           echo "📥 Pulling latest changes..."
           git reset --hard HEAD
@@ -46,14 +51,18 @@ jobs:
           git pull origin main
           
           echo "🔄 Restoring config files..."
-          # Restore config files if backups exist
-          [ -f "aliases.json.restore" ] && mv aliases.json.restore aliases.json
-          [ -f "reactions.json.restore" ] && mv reactions.json.restore reactions.json
-          [ -f "reminders.json.restore" ] && mv reminders.json.restore reminders.json
-          [ -f "appsettings.json.restore" ] && mv appsettings.json.restore appsettings.json
+          # Restore from temp location
+          [ -f "/tmp/peeb_backup/aliases.json" ] && cp /tmp/peeb_backup/aliases.json ./
+          [ -f "/tmp/peeb_backup/reactions.json" ] && cp /tmp/peeb_backup/reactions.json ./
+          [ -f "/tmp/peeb_backup/reminders.json" ] && cp /tmp/peeb_backup/reminders.json ./
+          [ -f "/tmp/peeb_backup/appsettings.json" ] && cp /tmp/peeb_backup/appsettings.json ./
+          [ -d "/tmp/peeb_backup/reactions" ] && cp -r /tmp/peeb_backup/reactions ./
+          
+          # Cleanup temp backup
+          rm -rf /tmp/peeb_backup
           
           echo "🧹 Cleaning up old backups (keep last 5)..."
-          ls -t backup_* 2>/dev/null | tail -n +6 | xargs rm -rf 2>/dev/null || true
+          cd /opt/peeb && ls -dt backup_*/ 2>/dev/null | tail -n +6 | xargs rm -rf 2>/dev/null || true
           
           echo "🔨 Building project..."
           dotnet build -c Release
