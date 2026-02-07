@@ -124,23 +124,29 @@ namespace DiscordBot.Plugins.ReminderPlugin.Services
             await SaveRemindersAsync();
 
             string recurrenceDescription = FormatRecurrenceDescription(reminder);
-            return $"📢 Server reminder set! {recurrenceDescription} Starting {firstTrigger:MMM dd, yyyy 'at' h:mm tt}";
+            return $"📢 Channel reminder set! {recurrenceDescription} Starting {firstTrigger:MMM dd, yyyy 'at' h:mm tt}";
         }
 
-        public async Task<List<Reminder>> GetUserRemindersAsync(ulong userId)
+        // Get reminders for a specific user in a specific channel
+        public async Task<List<Reminder>> GetUserRemindersAsync(ulong userId, ulong channelId)
         {
             return _reminderData.Reminders
-                .Where(r => r.UserId == userId && (!r.IsTriggered || r.IsRecurring) && 
+                .Where(r => r.UserId == userId && 
+                           r.ChannelId == channelId &&
+                           (!r.IsTriggered || r.IsRecurring) && 
                            (r.RecurrenceEndDate == null || r.RecurrenceEndDate > DateTime.Now) &&
                            (r.MaxTriggers == null || r.TriggerCount < r.MaxTriggers))
                 .OrderBy(r => r.TriggerTime)
                 .ToList();
         }
 
-        public async Task<bool> RemoveReminderAsync(ulong userId, string reminderId)
+        // Remove reminder only if it belongs to the user AND was created in this channel
+        public async Task<bool> RemoveReminderAsync(ulong userId, ulong channelId, string reminderId)
         {
             var reminder = _reminderData.Reminders.FirstOrDefault(r => 
-                r.Id == reminderId && r.UserId == userId);
+                r.Id == reminderId && 
+                r.UserId == userId &&
+                r.ChannelId == channelId);
             
             if (reminder != null)
             {
@@ -486,5 +492,3 @@ namespace DiscordBot.Plugins.ReminderPlugin.Services
         }
     }
 }
-
-//Test comment

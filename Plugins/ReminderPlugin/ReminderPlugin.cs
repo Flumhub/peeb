@@ -30,6 +30,7 @@ namespace DiscordBot.Plugins.ReminderPlugin
             _commands.Add(new RemindMeCommand(_reminderService));
             _commands.Add(new EveryReminderCommand(_reminderService));
             _commands.Add(new ServerReminderCommand(_reminderService));
+            _commands.Add(new ChannelReminderCommand(_reminderService));
             _commands.Add(new MyRemindersCommand(_reminderService));
             _commands.Add(new CancelReminderCommand(_reminderService));
 
@@ -87,5 +88,3 @@ namespace DiscordBot.Plugins.ReminderPlugin
         }
     }
 }
-
-//Test comment

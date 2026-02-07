@@ -10,7 +10,7 @@ namespace DiscordBot.Plugins.BasicPlugin
         public string Name => "Basic Commands";
         public string Description => "Provides basic bot functionality";
         
-        public const string Version = "1.1";
+        public const string Version = "1.2";
 
         private readonly ConfigurationService _configService;
         private DiscordSocketClient _client = null!;
@@ -71,7 +71,7 @@ namespace DiscordBot.Plugins.BasicPlugin
                         return true;
 
                     case "version":
-                        await message.Channel.SendMessageAsync($"Bot v{Version}");
+                        await message.Channel.SendMessageAsync($"🤖 Peeb Bot v{Version}");
                         return true;
                 }
             }
@@ -124,9 +124,11 @@ namespace DiscordBot.Plugins.BasicPlugin
                 $"`{_configService.CommandPrefix}every [N] days/weeks/months` - Custom intervals", false);
 
             // Server Reminder Commands
-            embed.AddField("**📢 Server Reminders**",
-                $"`{_configService.CommandPrefix}serverreminder every day at [time] [message]` - Daily server announcement\n" +
-                $"`{_configService.CommandPrefix}serverreminder every week on [day] at [time] [message]` - Weekly\n" +
+            embed.AddField("**📢 Channel Reminders**",
+                $"`{_configService.CommandPrefix}channelreminder every day at [HH:MM] [message]` - Daily\n" +
+                $"`{_configService.CommandPrefix}channelreminder every day at [HH:MM] [timezone] [message]` - With timezone\n" +
+                $"`{_configService.CommandPrefix}channelreminder every week on [day] at [HH:MM] [message]` - Weekly\n" +
+                "Timezones: UTC, UTC+1 to UTC+12, UTC-1 to UTC-12, PST, EST, etc.\n" +
                 "Attach an image to include it in the reminder!", false);
 
             // One-Time Examples
@@ -141,7 +143,8 @@ namespace DiscordBot.Plugins.BasicPlugin
                 $"`{_configService.CommandPrefix}every day at 9am take vitamins`\n" +
                 $"`{_configService.CommandPrefix}every week on monday at 2pm team meeting`\n" +
                 $"`{_configService.CommandPrefix}every month on the 15th pay bills`\n" +
-                $"`{_configService.CommandPrefix}serverreminder every day at 5pm Check in!`", false);
+                $"`{_configService.CommandPrefix}channelreminder every day at 17:00 Check in!`\n" +
+                $"`{_configService.CommandPrefix}channelreminder every day at 09:00 UTC-8 Good morning!`", false);
 
             embed.WithFooter("💡 You can also just type reaction names (like 'thanks' or 'haha') to use saved reactions!");
 

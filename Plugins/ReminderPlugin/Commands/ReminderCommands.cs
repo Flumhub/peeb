@@ -158,7 +158,7 @@ namespace DiscordBot.Plugins.ReminderPlugin.Commands
     public class MyRemindersCommand : ICommandHandler
     {
         public string Command => "myreminders";
-        public string Description => "List your active reminders";
+        public string Description => "List your active reminders in this channel";
         public string Usage => "myreminders";
 
         private readonly ReminderService _reminderService;
@@ -170,16 +170,17 @@ namespace DiscordBot.Plugins.ReminderPlugin.Commands
 
         public async Task<bool> HandleAsync(SocketMessage message, string[] args)
         {
-            var reminders = await _reminderService.GetUserRemindersAsync(message.Author.Id);
+            // Get reminders only for this channel
+            var reminders = await _reminderService.GetUserRemindersAsync(message.Author.Id, message.Channel.Id);
 
             if (!reminders.Any())
             {
-                await message.Channel.SendMessageAsync("📅 You have no active reminders.");
+                await message.Channel.SendMessageAsync("📅 You have no active reminders in this channel.");
                 return true;
             }
 
             var embed = new EmbedBuilder()
-                .WithTitle("📅 Your Active Reminders")
+                .WithTitle("📅 Your Active Reminders (This Channel)")
                 .WithColor(Color.Blue)
                 .WithCurrentTimestamp();
 
@@ -192,7 +193,9 @@ namespace DiscordBot.Plugins.ReminderPlugin.Commands
                     ? $"in {(int)timeUntil.TotalHours} hours"
                     : $"in {(int)timeUntil.TotalMinutes} minutes";
 
-                var reminderTitle = reminder.IsRecurring 
+                var reminderTitle = reminder.IsServerReminder
+                    ? $"📢 {reminder.TriggerTime:MMM dd, h:mm tt} ({GetRecurrenceDescription(reminder)})"
+                    : reminder.IsRecurring 
                     ? $"🔄 {reminder.TriggerTime:MMM dd, h:mm tt} ({GetRecurrenceDescription(reminder)})"
                     : $"⏰ {reminder.TriggerTime:MMM dd, h:mm tt}";
 
@@ -255,7 +258,7 @@ namespace DiscordBot.Plugins.ReminderPlugin.Commands
     public class CancelReminderCommand : ICommandHandler
     {
         public string Command => "cancelreminder";
-        public string Description => "Cancel a reminder by ID";
+        public string Description => "Cancel a reminder by ID (must be in the same channel where it was created)";
         public string Usage => "cancelreminder [reminder_id]";
 
         private readonly ReminderService _reminderService;
@@ -269,17 +272,17 @@ namespace DiscordBot.Plugins.ReminderPlugin.Commands
         {
             if (args.Length < 2)
             {
-                await message.Channel.SendMessageAsync($"Usage: `{Usage}`\nUse `peeb myreminders` to see your reminder IDs.");
+                await message.Channel.SendMessageAsync($"Usage: `{Usage}`\nUse `peeb myreminders` to see your reminder IDs in this channel.");
                 return true;
             }
 
             var reminderId = args[1];
             
-            // If they provided a short ID (first 8 chars), find the full ID
-            var userReminders = await _reminderService.GetUserRemindersAsync(message.Author.Id);
+            // If they provided a short ID (first 8 chars), find the full ID from this channel only
+            var userReminders = await _reminderService.GetUserRemindersAsync(message.Author.Id, message.Channel.Id);
             var fullReminderId = userReminders.FirstOrDefault(r => r.Id.StartsWith(reminderId))?.Id ?? reminderId;
 
-            var success = await _reminderService.RemoveReminderAsync(message.Author.Id, fullReminderId);
+            var success = await _reminderService.RemoveReminderAsync(message.Author.Id, message.Channel.Id, fullReminderId);
 
             if (success)
             {
@@ -287,7 +290,7 @@ namespace DiscordBot.Plugins.ReminderPlugin.Commands
             }
             else
             {
-                await message.Channel.SendMessageAsync($"❌ Could not find reminder with ID `{reminderId}`. Use `peeb myreminders` to see your active reminders.");
+                await message.Channel.SendMessageAsync($"❌ Could not find reminder with ID `{reminderId}` in this channel. Use `peeb myreminders` to see your active reminders here.");
             }
 
             return true;
