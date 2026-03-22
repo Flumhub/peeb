@@ -12,10 +12,10 @@ class Basic(commands.Cog):
         if message.author.bot:
             return
         content = message.content.lower()
-        if "good bot" in content:
+        if "good peeb" in content:
             await message.add_reaction("😊")
             await message.channel.send("Thank you! 😊")
-        elif "bad bot" in content:
+        elif "bad peeb" in content:
             await message.add_reaction("😢")
             await message.channel.send("I'm sorry... I'll try to do better! 😢")
 

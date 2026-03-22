@@ -29,6 +29,7 @@ async def main():
         bot.load_extension("cogs.basic")
         bot.load_extension("cogs.reactions")
         bot.load_extension("cogs.reminders")
+        bot.load_extension("cogs.claude")
         await bot.start(token)
 
 if __name__ == "__main__":
