@@ -20,6 +20,10 @@ class Basic(commands.Cog):
             await message.channel.send("I'm sorry... I'll try to do better! 😢")
 
     @commands.command()
+    async def version(self, ctx):
+        await ctx.send("Peeb Bot v2.0.0")
+
+    @commands.command()
     async def ping(self, ctx):
         await ctx.send("Pong! 🏓")
 
