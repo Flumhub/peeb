@@ -44,6 +44,7 @@ class ClaudeChat(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
+        print(f"on_message: {message.content} | mentions: {message.mentions} | bot_user: {self.bot.user}")
         if message.author.bot:
             return
         if message.content.startswith(self.bot.command_prefix):
@@ -67,10 +68,10 @@ class ClaudeChat(commands.Cog):
         history = await self._build_history(message)
         response = await self._ask_claude(history, force_respond=force_respond)
 
-        if response and response != PASS_TOKEN:
+        if response and not response.startswith(PASS_TOKEN):
             await message.channel.send(response)
             self._set_channel_active(channel_id)
-        elif response == PASS_TOKEN and not channel_active:
+        elif response and response.startswith(PASS_TOKEN) and not channel_active:
             self._clear_channel(channel_id)
 
     async def _fetch_image(self, url):
@@ -101,7 +102,6 @@ class ClaudeChat(commands.Cog):
             author = msg.author.display_name
             history.append({"role": "user", "content": f"{author}: {msg.content}"})
 
-        # Build trigger message content with possible images
         author = trigger_message.author.display_name
         content = []
 
