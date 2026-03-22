@@ -1,4 +1,3 @@
-# --- START: .github/workflows/deploy.yml ---
 name: Deploy Peeb Bot
 
 on:
@@ -7,10 +6,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-    - name: Deploy to Server
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Log in to GHCR
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        push: true
+        tags: ghcr.io/flumhub/peeb:dev
+
+    - name: Deploy to VM
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ secrets.SERVER_HOST }}
@@ -18,50 +34,10 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         port: 22
         script: |
+          echo "📥 Pulling latest image..."
+          docker pull ghcr.io/flumhub/peeb:dev
 
-          export DISCORD_TOKEN=${{ secrets.PEEB_TOKEN_DEV }}
+          echo "⏹️ Restarting bot..."
+          systemctl restart peeb-bot-dev
 
-          echo "🚀 Starting deployment..."
-          cd /opt/peeb
-
-          echo "⏹️ Stopping bot..."
-          systemctl stop peeb-bot
-
-          echo "💾 Backing up config files..."
-          BACKUP_DIR="/opt/peeb/backup_$(date +%Y%m%d_%H%M%S)"
-          mkdir -p "$BACKUP_DIR"
-          [ -f "config.json" ]    && cp config.json    "$BACKUP_DIR/"
-          [ -f "reactions.json" ] && cp reactions.json "$BACKUP_DIR/"
-          [ -f "aliases.json" ]   && cp aliases.json   "$BACKUP_DIR/"
-          [ -f "reminders.json" ] && cp reminders.json "$BACKUP_DIR/"
-          [ -d "reactions" ]      && cp -r reactions   "$BACKUP_DIR/"
-
-          [ -f "config.json" ]    && cp config.json    config.json.restore
-          [ -f "reactions.json" ] && cp reactions.json reactions.json.restore
-          [ -f "aliases.json" ]   && cp aliases.json   aliases.json.restore
-          [ -f "reminders.json" ] && cp reminders.json reminders.json.restore
-
-          echo "📥 Pulling latest changes..."
-          git reset --hard HEAD
-          git clean -fd
-          git pull origin main
-
-          echo "🔄 Restoring config files..."
-          [ -f "config.json.restore" ]    && mv config.json.restore    config.json
-          [ -f "reactions.json.restore" ] && mv reactions.json.restore reactions.json
-          [ -f "aliases.json.restore" ]   && mv aliases.json.restore   aliases.json
-          [ -f "reminders.json.restore" ] && mv reminders.json.restore reminders.json
-          [ -d "$BACKUP_DIR/reactions" ]  && cp -r "$BACKUP_DIR/reactions" .
-
-          echo "📦 Installing dependencies..."
-          python3 -m pip install -r requirements.txt --quiet
-
-          echo "🧹 Cleaning up old backups (keep last 5)..."
-          ls -t backup_* 2>/dev/null | tail -n +6 | xargs rm -rf 2>/dev/null || true
-
-          echo "▶️ Starting bot..."
-          systemctl start peeb-bot
-          sleep 3
-          systemctl is-active peeb-bot
-          echo "✅ Deployment complete!"
-# --- END: .github/workflows/deploy.yml ---
+          echo "✅ Done!"
