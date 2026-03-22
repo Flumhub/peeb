@@ -1,4 +1,3 @@
-# --- START: main.py ---
 import discord
 from discord.ext import commands
 import json
@@ -23,13 +22,15 @@ async def on_ready():
     print(f"{bot.user} is connected and ready!")
 
 async def main():
+    token = os.environ.get("PEEB_TOKEN_DEV")
+    if not token:
+        raise ValueError("PEEB_TOKEN_DEV environment variable not set")
     async with bot:
         bot.load_extension("cogs.basic")
         bot.load_extension("cogs.reactions")
         bot.load_extension("cogs.reminders")
-        await bot.start(config["token"])
+        await bot.start(token)
 
 if __name__ == "__main__":
     import asyncio
     asyncio.run(main())
-# --- END: main.py ---

@@ -3,7 +3,7 @@ name: Deploy Peeb Bot
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ dev ]
   workflow_dispatch:
 
 jobs:
@@ -18,6 +18,9 @@ jobs:
         key: ${{ secrets.SERVER_SSH_KEY }}
         port: 22
         script: |
+
+          export DISCORD_TOKEN=${{ secrets.PEEB_TOKEN_DEV }}
+
           echo "🚀 Starting deployment..."
           cd /opt/peeb
 
