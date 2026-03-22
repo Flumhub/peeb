@@ -18,6 +18,11 @@ intents.guild_messages = True
 bot = commands.Bot(command_prefix=PREFIX, intents=intents, help_command=None)
 
 @bot.event
+
+async def on_command_error(ctx, error):
+    if isinstance(error, commands.CommandNotFound):
+        return
+
 async def on_ready():
     print(f"{bot.user} is connected and ready!")
 
