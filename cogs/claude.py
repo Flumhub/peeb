@@ -41,7 +41,6 @@ class ClaudeChat(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        print(f"Message received: {message.content} | mentioned: {self.bot.user in message.mentions}")
 
         if message.author.bot:
             return
