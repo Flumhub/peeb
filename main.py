@@ -22,9 +22,9 @@ async def on_ready():
     print(f"{bot.user} is connected and ready!")
 
 async def main():
-    token = os.environ.get("PEEB_TOKEN_DEV")
+    token = os.environ.get("DISCORD_TOKEN")
     if not token:
-        raise ValueError("PEEB_TOKEN_DEV environment variable not set")
+        raise ValueError("DISCORD_TOKEN environment variable not set")
     async with bot:
         bot.load_extension("cogs.basic")
         bot.load_extension("cogs.reactions")
