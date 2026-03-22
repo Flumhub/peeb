@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 import anthropic
 import os
+import base64
+import aiohttp
 from datetime import datetime, timedelta
 
 SYSTEM_PROMPT = """You are Peeb, a Discord bot. Your primary task is to talk with people in a chat setting. Normally you will receive about 20 lines of text as context, focus on the last message which invoked your call; the lines you get as context not necessarily related to what's going asked, in that case discard them.
@@ -19,6 +21,7 @@ If a message merely mentions your name in passing without addressing you or expe
 
 PASS_TOKEN = "[PASS]"
 ACTIVE_DURATION = timedelta(minutes=5)
+SUPPORTED_MEDIA_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 
 client = anthropic.Anthropic(api_key=os.environ["CLAUDE_API_KEY"])
 
@@ -41,7 +44,6 @@ class ClaudeChat(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-
         if message.author.bot:
             return
         if message.content.startswith(self.bot.command_prefix):
@@ -71,6 +73,15 @@ class ClaudeChat(commands.Cog):
         elif response == PASS_TOKEN and not channel_active:
             self._clear_channel(channel_id)
 
+    async def _fetch_image(self, url):
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status == 200:
+                    data = await resp.read()
+                    media_type = resp.content_type.split(";")[0].strip()
+                    return base64.standard_b64encode(data).decode("utf-8"), media_type
+        return None, None
+
     async def _build_history(self, trigger_message):
         messages = []
         async for msg in trigger_message.channel.history(limit=21):
@@ -90,8 +101,31 @@ class ClaudeChat(commands.Cog):
             author = msg.author.display_name
             history.append({"role": "user", "content": f"{author}: {msg.content}"})
 
+        # Build trigger message content with possible images
         author = trigger_message.author.display_name
-        history.append({"role": "user", "content": f"{author}: {trigger_message.content}"})
+        content = []
+
+        if trigger_message.content:
+            content.append({"type": "text", "text": f"{author}: {trigger_message.content}"})
+
+        for attachment in trigger_message.attachments:
+            media_type = attachment.content_type.split(";")[0].strip() if attachment.content_type else ""
+            if media_type in SUPPORTED_MEDIA_TYPES:
+                image_data, fetched_type = await self._fetch_image(attachment.url)
+                if image_data:
+                    content.append({
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": fetched_type,
+                            "data": image_data
+                        }
+                    })
+
+        if not content:
+            content.append({"type": "text", "text": f"{author}: [sent a message]"})
+
+        history.append({"role": "user", "content": content})
 
         return history
 
