@@ -1,0 +1,13 @@
+# --- START: .gitignore ---
+__pycache__/
+*.pyc
+.env
+
+# Runtime data
+config.json
+reactions/
+reactions.json
+aliases.json
+reminders.json
+backup_*/
+# --- END: .gitignore ---
