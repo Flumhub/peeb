@@ -51,16 +51,21 @@ client = anthropic.AsyncAnthropic(api_key=os.environ["CLAUDE_API_KEY"])
 
 
 def _do_web_search(query: str) -> str:
+    print(f"[search] query: {query!r}")
     try:
         ddgs = DDGS()
 
         # Try instant answers first (best for factual/simple queries)
         instant = list(ddgs.answers(query))
+        print(f"[search] instant answers: {instant}")
         if instant:
-            return instant[0].get("text", str(instant[0]))
+            result = instant[0].get("text", str(instant[0]))
+            print(f"[search] returning instant: {result!r}")
+            return result
 
         # Fall back to web results
         results = list(ddgs.text(query, max_results=4))
+        print(f"[search] text results: {results}")
         if not results:
             return "No results found."
         lines = []
@@ -68,6 +73,7 @@ def _do_web_search(query: str) -> str:
             lines.append(f"{r['title']}: {r['body']}")
         return "\n\n".join(lines)
     except Exception as e:
+        print(f"[search] exception: {type(e).__name__}: {e}")
         return f"Search failed: {e}"
 
 
