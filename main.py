@@ -23,6 +23,7 @@ async def on_command_error(ctx, error):
     if isinstance(error, commands.CommandNotFound):
         return
 
+@bot.event
 async def on_ready():
     print(f"{bot.user} is connected and ready!")
 
