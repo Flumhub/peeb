@@ -52,12 +52,20 @@ client = anthropic.AsyncAnthropic(api_key=os.environ["CLAUDE_API_KEY"])
 
 def _do_web_search(query: str) -> str:
     try:
-        results = DDGS().text(query, max_results=4)
+        ddgs = DDGS()
+
+        # Try instant answers first (best for factual/simple queries)
+        instant = list(ddgs.answers(query))
+        if instant:
+            return instant[0].get("text", str(instant[0]))
+
+        # Fall back to web results
+        results = list(ddgs.text(query, max_results=4))
         if not results:
             return "No results found."
         lines = []
         for r in results:
-            lines.append(f"**{r['title']}**\n{r['body']}\n{r['href']}")
+            lines.append(f"{r['title']}: {r['body']}")
         return "\n\n".join(lines)
     except Exception as e:
         return f"Search failed: {e}"
