@@ -28,7 +28,13 @@ SESSION_LOG_CAP = 60  # max messages kept per session (~1500 tokens overhead at 
 
 WEB_SEARCH_TOOL = {
     "name": "web_search",
-    "description": "Search the web for current information. Use this when someone asks you to look something up or when you need up-to-date information.",
+    "description": (
+        "Search the web for information you cannot answer from your own knowledge. "
+        "Use this ONLY for: current events, recent news, live data (prices, scores, weather), "
+        "or specific facts you are genuinely uncertain about. "
+        "Do NOT use it for general knowledge, things you already know, or simple factual questions. "
+        "Always form a concise, specific search query — avoid conversational phrasing like 'what year is it'."
+    ),
     "input_schema": {
         "type": "object",
         "properties": {
