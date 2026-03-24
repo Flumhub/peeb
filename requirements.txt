@@ -1,4 +1,4 @@
 py-cord
 aiohttp
 anthropic
-duckduckgo_search
+ddgs

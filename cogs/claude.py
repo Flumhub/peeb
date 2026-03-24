@@ -6,7 +6,7 @@ import base64
 import aiohttp
 import asyncio
 from datetime import datetime, timedelta
-from duckduckgo_search import DDGS
+from ddgs import DDGS
 
 SYSTEM_PROMPT = """You are Peeb, a Discord bot. Your primary task is to talk with people in a chat setting. Normally you will receive about 20 lines of text as context, focus on the last message which invoked your call; the lines you get as context not necessarily related to what's asked, in that case discard them.
 
