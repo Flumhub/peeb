@@ -29,11 +29,9 @@ SESSION_LOG_CAP = 60  # max messages kept per session (~1500 tokens overhead at 
 WEB_SEARCH_TOOL = {
     "name": "web_search",
     "description": (
-        "Search the web for information you cannot answer from your own knowledge. "
-        "Use this ONLY for: current events, recent news, live data (prices, scores, weather), "
-        "or specific facts you are genuinely uncertain about. "
-        "Do NOT use it for general knowledge, things you already know, or simple factual questions. "
-        "Always form a concise, specific search query — avoid conversational phrasing like 'what year is it'."
+        "Search the web. Use this when the user explicitly asks you to search, look something up, or check the internet — "
+        "even if you think you already know the answer. Do NOT use it unless the user has asked for a web search. "
+        "Always form a concise, specific search query."
     ),
     "input_schema": {
         "type": "object",
@@ -54,7 +52,6 @@ def _do_web_search(query: str) -> str:
     print(f"[search] query: {query!r}")
     try:
         results = list(DDGS().text(query, max_results=4))
-        print(f"[search] results: {results}")
         if not results:
             return "No results found."
         lines = []
