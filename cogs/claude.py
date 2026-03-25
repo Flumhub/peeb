@@ -199,17 +199,23 @@ class ClaudeChat(commands.Cog):
                 messages=messages,
             )
 
-            print(f"[claude] stop_reason={response.stop_reason}")
+            # Find last search block so we can skip any preamble text before it
+            search_end_idx = -1
             for i, block in enumerate(response.content):
-                btype = type(block).__name__
-                text = repr(getattr(block, "text", None))
-                print(f"[claude] block[{i}] {btype} text={text[:120]}")
+                if type(block).__name__ in ("WebSearchToolResultBlock", "ServerToolUseBlock"):
+                    search_end_idx = i
 
-            # Native web search is server-side (stop_reason always end_turn).
-            # Response may contain a preamble TextBlock before search blocks, then the real answer.
-            # Return the last non-empty text block to skip any "I'll check..." preambles.
-            text_blocks = [b.text.strip() for b in response.content if hasattr(b, "text") and b.text.strip()]
-            return text_blocks[-1] if text_blocks else None
+            if search_end_idx >= 0:
+                # Join text blocks after search results — Anthropic splits at citation boundaries
+                # so the "." starting block[n+1] is the natural period ending block[n]
+                parts = [
+                    b.text for b in response.content[search_end_idx + 1:]
+                    if hasattr(b, "text") and b.text.strip()
+                ]
+                return "".join(parts).strip() or None
+            else:
+                text_blocks = [b.text.strip() for b in response.content if hasattr(b, "text") and b.text.strip()]
+                return text_blocks[-1] if text_blocks else None
 
         except Exception as e:
             print(f"Claude API error: {e}")
