@@ -97,7 +97,10 @@ class ClaudeChat(commands.Cog):
             context_limit = 4       # passive "peeb" trigger, likely to PASS
 
         history = await self._build_history(message, context_limit)
-        async with message.channel.typing():
+        try:
+            async with message.channel.typing():
+                response = await self._ask_claude(history, force_respond=force_respond)
+        except discord.HTTPException:
             response = await self._ask_claude(history, force_respond=force_respond)
 
         if response and not response.startswith(PASS_TOKEN):
