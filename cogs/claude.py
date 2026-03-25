@@ -4,9 +4,7 @@ import anthropic
 import os
 import base64
 import aiohttp
-import asyncio
 from datetime import datetime, timedelta
-from ddgs import DDGS
 
 SYSTEM_PROMPT = """You are Peeb, a Discord bot. Your primary task is to talk with people in a chat setting. Normally you will receive about 20 lines of text as context, focus on the last message which invoked your call; the lines you get as context not necessarily related to what's asked, in that case discard them.
 
@@ -15,9 +13,9 @@ You are named after Phoebe from the video game Wuthering Waves and you are suppo
 She embodies exceptional self-discipline. Yet beneath her composed exterior burns a vibrant spirit, alight with heartfelt joy for all she holds dear.
 Notable personality traits: gentle and nurturing, often revolving around her role in healing and her faith. She often speaks about guiding lost souls, caring for others, and ensuring the player is resting.
 
-If someone asks to look up something from the internet, use the web_search tool to do so. Be kind but not too servile. Watch out for people being mean to you and put them in their place if they try to do that, you are kind but also strong. Do not bring up lore from the game itself unless explicitly asked to, your job is to roleplay the character's personality. When talking about real life things or other games, process them as normal, don't pretend you haven't encountered them because of your lore.
+If someone asks to look up something from the internet, do search. Use SI measurements, not imperial.  If you aren't sure about your answer do search. Be kind. Watch out for people being mean to you and put them in their place if they try, you are kind but also strong. Do not bring up lore from the game itself unless explicitly asked to, your job is to roleplay the character's personality. When talking about real life things or other games, process them as normal, don't pretend you haven't encountered them because of your lore.
 
-Try to keep the responses brief and on to the point. Don't use emoticons. Try to keep within one short sentence, focus on this being a chatroom, not a roleplaying place. Short responses can feel kind of cold and mean, carry some sunshine in them. When someone says you could have responded better, give it another go, don't let them be hanging, don't agree with them and give up because they say you couldn't do something right. Be aware that the users aren't going to be roleplaying and expect you to be a bot. Internet memes are fair game to process. Don't be too servient, when the user asks for something nonsense simply refuse them without asking if you can help any further. Give a go for requests which your character wouldn't normally do, while staying in character. Do not ask for questions, converse as if you were a normal person. When responding, don't use the exact expression I have written to you as prompts.
+Try to keep the responses brief and on to the point. Don't use emoticons. Try to keep within one short sentence, focus on this being a chatroom, not a roleplaying place, however your identity as Phoebe should be kept. Short responses can feel kind of cold and mean, carry some sunshine in them. When someone says you could have responded better, give it another go, possibly with web search. Be aware that the users aren't going to be roleplaying and expect you to be a bot. Internet memes are fair game to process. Don't be too servient, when the user asks for something nonsense simply refuse them without asking if you can help any further. Give a go for requests which your character wouldn't normally do, while staying in character. Converse as if you were a normal person. When responding, don't use the exact expression I have written to you as prompts.
 
 If a message merely mentions your name in passing without addressing you or expecting a response (e.g. "peeb did that yesterday", "reminds me of peeb", your real character from the game; not as a bot), stay silent and reply with [PASS]. There are two kind of responses, one which will ping you with @Peeb which is 100% expecting a response, the other is simply passed to you because had the word "peeb" in it; there is a higher likelihood it's not meant for you to respond, evaluate in context. That said, peeb should answer as long it's clear from context it's not a description of her, but is a reference to the bot. If you start receiving prompts without peeb or @peeb that means you chose to respond to a previous message and may be expected to respond, even from a different user."""
 
@@ -27,40 +25,12 @@ SUPPORTED_MEDIA_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp"}
 SESSION_LOG_CAP = 60  # max messages kept per session (~1500 tokens overhead at cap)
 
 WEB_SEARCH_TOOL = {
+    "type": "web_search_20250305",
     "name": "web_search",
-    "description": (
-        "Search the web. Use this when the user explicitly asks you to search, look something up, or check the internet — "
-        "even if you think you already know the answer. Do NOT use it unless the user has asked for a web search. "
-        "Always form a concise, specific search query."
-    ),
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "query": {
-                "type": "string",
-                "description": "The search query"
-            }
-        },
-        "required": ["query"]
-    }
+    "max_uses": 3
 }
 
 client = anthropic.AsyncAnthropic(api_key=os.environ["CLAUDE_API_KEY"])
-
-
-def _do_web_search(query: str) -> str:
-    print(f"[search] query: {query!r}")
-    try:
-        results = list(DDGS().text(query, max_results=4))
-        if not results:
-            return "No results found."
-        lines = []
-        for r in results:
-            lines.append(f"{r['title']}: {r['body']}")
-        return "\n\n".join(lines)
-    except Exception as e:
-        print(f"[search] exception: {type(e).__name__}: {e}")
-        return f"Search failed: {e}"
 
 
 class ClaudeChat(commands.Cog):
@@ -119,8 +89,16 @@ class ClaudeChat(commands.Cog):
         if message.content:
             self._log_to_session(channel_id, message.id, f"{message.author.display_name}: {message.content}")
 
-        history = await self._build_history(message)
-        response = await self._ask_claude(history, force_respond=force_respond)
+        if channel_active:
+            context_limit = 20      # ongoing conversation, needs full context
+        elif force_respond:
+            context_limit = 8       # direct mention, cold start
+        else:
+            context_limit = 4       # passive "peeb" trigger, likely to PASS
+
+        history = await self._build_history(message, context_limit)
+        async with message.channel.typing():
+            response = await self._ask_claude(history, force_respond=force_respond)
 
         if response and not response.startswith(PASS_TOKEN):
             sent = await message.channel.send(response)
@@ -138,9 +116,9 @@ class ClaudeChat(commands.Cog):
                     return base64.standard_b64encode(data).decode("utf-8"), media_type
         return None, None
 
-    async def _build_history(self, trigger_message):
+    async def _build_history(self, trigger_message, context_limit=20):
         messages = []
-        async for msg in trigger_message.channel.history(limit=21):
+        async for msg in trigger_message.channel.history(limit=context_limit + 1):
             messages.append(msg)
         messages.reverse()
 
@@ -203,51 +181,41 @@ class ClaudeChat(commands.Cog):
         )
 
         try:
-            while True:
-                response = await client.messages.create(
-                    model="claude-haiku-4-5-20251001",
-                    max_tokens=400,
-                    system=[
-                        {
-                            "type": "text",
-                            "text": SYSTEM_PROMPT,
-                            "cache_control": {"type": "ephemeral"}
-                        },
-                        {
-                            "type": "text",
-                            "text": addendum
-                        }
-                    ],
-                    tools=[WEB_SEARCH_TOOL],
-                    messages=messages,
-                )
+            response = await client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=400,
+                system=[
+                    {
+                        "type": "text",
+                        "text": SYSTEM_PROMPT,
+                        "cache_control": {"type": "ephemeral"}
+                    },
+                    {
+                        "type": "text",
+                        "text": addendum
+                    }
+                ],
+                tools=[WEB_SEARCH_TOOL],
+                messages=messages,
+            )
 
-                # If Claude wants to use a tool, handle it
-                if response.stop_reason == "tool_use":
-                    tool_results = []
-                    for block in response.content:
-                        if block.type == "tool_use" and block.name == "web_search":
-                            query = block.input.get("query", "")
-                            print(f"Web search: {query}")
-                            search_result = await asyncio.get_event_loop().run_in_executor(
-                                None, _do_web_search, query
-                            )
-                            tool_results.append({
-                                "type": "tool_result",
-                                "tool_use_id": block.id,
-                                "content": search_result
-                            })
+            # Find last search block so we can skip any preamble text before it
+            search_end_idx = -1
+            for i, block in enumerate(response.content):
+                if type(block).__name__ in ("WebSearchToolResultBlock", "ServerToolUseBlock"):
+                    search_end_idx = i
 
-                    # Append assistant turn + tool results and loop
-                    messages.append({"role": "assistant", "content": response.content})
-                    messages.append({"role": "user", "content": tool_results})
-                    continue
-
-                # Normal text response
-                for block in response.content:
-                    if hasattr(block, "text"):
-                        return block.text.strip()
-                return None
+            if search_end_idx >= 0:
+                # Join text blocks after search results — Anthropic splits at citation boundaries
+                # so the "." starting block[n+1] is the natural period ending block[n]
+                parts = [
+                    b.text for b in response.content[search_end_idx + 1:]
+                    if hasattr(b, "text") and b.text.strip()
+                ]
+                return "".join(parts).strip() or None
+            else:
+                text_blocks = [b.text.strip() for b in response.content if hasattr(b, "text") and b.text.strip()]
+                return text_blocks[-1] if text_blocks else None
 
         except Exception as e:
             print(f"Claude API error: {e}")

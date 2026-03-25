@@ -21,7 +21,7 @@ class Basic(commands.Cog):
 
     @commands.command()
     async def version(self, ctx):
-        await ctx.send("Peeb Bot v2.0.0")
+        await ctx.send("Peeb Bot v2.1.3")
 
     @commands.command()
     async def ping(self, ctx):
