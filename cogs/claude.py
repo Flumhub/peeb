@@ -199,6 +199,12 @@ class ClaudeChat(commands.Cog):
                 messages=messages,
             )
 
+            print(f"[claude] stop_reason={response.stop_reason}")
+            for i, block in enumerate(response.content):
+                btype = type(block).__name__
+                text = repr(getattr(block, "text", None))
+                print(f"[claude] block[{i}] {btype} text={text[:120]}")
+
             # Native web search is server-side (stop_reason always end_turn).
             # Response may contain a preamble TextBlock before search blocks, then the real answer.
             # Return the last non-empty text block to skip any "I'll check..." preambles.
