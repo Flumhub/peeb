@@ -97,7 +97,8 @@ class ClaudeChat(commands.Cog):
             context_limit = 4       # passive "peeb" trigger, likely to PASS
 
         history = await self._build_history(message, context_limit)
-        response = await self._ask_claude(history, force_respond=force_respond)
+        async with message.channel.typing():
+            response = await self._ask_claude(history, force_respond=force_respond)
 
         if response and not response.startswith(PASS_TOKEN):
             sent = await message.channel.send(response)
@@ -180,28 +181,34 @@ class ClaudeChat(commands.Cog):
         )
 
         try:
-            response = await client.messages.create(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=400,
-                system=[
-                    {
-                        "type": "text",
-                        "text": SYSTEM_PROMPT,
-                        "cache_control": {"type": "ephemeral"}
-                    },
-                    {
-                        "type": "text",
-                        "text": addendum
-                    }
-                ],
-                tools=[WEB_SEARCH_TOOL],
-                messages=messages,
-            )
+            for _ in range(5):  # cap iterations to prevent infinite loops
+                response = await client.messages.create(
+                    model="claude-haiku-4-5-20251001",
+                    max_tokens=400,
+                    system=[
+                        {
+                            "type": "text",
+                            "text": SYSTEM_PROMPT,
+                            "cache_control": {"type": "ephemeral"}
+                        },
+                        {
+                            "type": "text",
+                            "text": addendum
+                        }
+                    ],
+                    tools=[WEB_SEARCH_TOOL],
+                    messages=messages,
+                )
 
-            for block in response.content:
-                if hasattr(block, "text"):
-                    return block.text.strip()
-            return None
+                if response.stop_reason == "tool_use":
+                    # Native tool: append assistant turn and resubmit — Anthropic executes the search
+                    messages.append({"role": "assistant", "content": response.content})
+                    continue
+
+                for block in response.content:
+                    if hasattr(block, "text"):
+                        return block.text.strip()
+                return None
 
         except Exception as e:
             print(f"Claude API error: {e}")
