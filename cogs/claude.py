@@ -109,8 +109,12 @@ class ClaudeChat(commands.Cog):
             sent = await message.channel.send(response)
             self._set_channel_active(channel_id)
             self._log_to_session(channel_id, sent.id, f"Peeb: {response}")
-        elif response and response.startswith(PASS_TOKEN) and not channel_active:
-            self._clear_channel(channel_id)
+        elif response and response.startswith(PASS_TOKEN):
+            print(f"[peeb] PASS (force={force_respond}, active={channel_active}): {message.content[:80]}")
+            if not channel_active:
+                self._clear_channel(channel_id)
+        else:
+            print(f"[peeb] no response (force={force_respond}): {message.content[:80]}")
 
     async def _fetch_image(self, url):
         async with aiohttp.ClientSession() as session:
