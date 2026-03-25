@@ -181,36 +181,29 @@ class ClaudeChat(commands.Cog):
         )
 
         try:
-            for _ in range(5):  # cap iterations to prevent infinite loops
-                response = await client.messages.create(
-                    model="claude-haiku-4-5-20251001",
-                    max_tokens=400,
-                    system=[
-                        {
-                            "type": "text",
-                            "text": SYSTEM_PROMPT,
-                            "cache_control": {"type": "ephemeral"}
-                        },
-                        {
-                            "type": "text",
-                            "text": addendum
-                        }
-                    ],
-                    tools=[WEB_SEARCH_TOOL],
-                    messages=messages,
-                )
+            response = await client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=400,
+                system=[
+                    {
+                        "type": "text",
+                        "text": SYSTEM_PROMPT,
+                        "cache_control": {"type": "ephemeral"}
+                    },
+                    {
+                        "type": "text",
+                        "text": addendum
+                    }
+                ],
+                tools=[WEB_SEARCH_TOOL],
+                messages=messages,
+            )
 
-                print(f"[claude] stop_reason={response.stop_reason} blocks={[type(b).__name__ for b in response.content]}")
-
-                if response.stop_reason == "tool_use":
-                    # Native tool: append assistant turn and resubmit — Anthropic executes the search
-                    messages.append({"role": "assistant", "content": response.content})
-                    continue
-
-                for block in response.content:
-                    if hasattr(block, "text"):
-                        return block.text.strip()
-                return None
+            # Native web search is server-side (stop_reason always end_turn).
+            # Response may contain a preamble TextBlock before search blocks, then the real answer.
+            # Return the last non-empty text block to skip any "I'll check..." preambles.
+            text_blocks = [b.text.strip() for b in response.content if hasattr(b, "text") and b.text.strip()]
+            return text_blocks[-1] if text_blocks else None
 
         except Exception as e:
             print(f"Claude API error: {e}")
