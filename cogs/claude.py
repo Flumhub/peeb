@@ -101,9 +101,9 @@ class ClaudeChat(commands.Cog):
         history = await self._build_history(message, context_limit)
         try:
             async with message.channel.typing():
-                response = await self._ask_claude(history, force_respond=force_respond)
+                response = await self._ask_claude(history, force_respond=force_respond, channel_active=channel_active)
         except discord.HTTPException:
-            response = await self._ask_claude(history, force_respond=force_respond)
+            response = await self._ask_claude(history, force_respond=force_respond, channel_active=channel_active)
 
         if response and not response.startswith(PASS_TOKEN):
             sent = await message.channel.send(response)
@@ -179,15 +179,15 @@ class ClaudeChat(commands.Cog):
 
         return history
 
-    async def _ask_claude(self, history, force_respond=False):
+    async def _ask_claude(self, history, force_respond=False, channel_active=False):
         messages = list(history)
 
-        # When force_respond, tell Claude it MUST reply; otherwise remind it to PASS if not addressed
-        addendum = (
-            "\n\nYou have been directly mentioned or quoted. You must respond."
-            if force_respond
-            else f'\n\nIf this message does not clearly address you, reply with exactly "{PASS_TOKEN}" and nothing else.'
-        )
+        if force_respond:
+            addendum = f'\n\nThe user has directly @mentioned or quoted you. Responding with "{PASS_TOKEN}" is forbidden. You MUST give a real reply, even if the message is short, odd, or unclear.'
+        elif channel_active:
+            addendum = f'\n\nYou are in an active conversation. Engage naturally if the message is something you can meaningfully add to. Only reply with "{PASS_TOKEN}" if the message is clearly not directed at anyone or has nothing for you to contribute.'
+        else:
+            addendum = f'\n\nIf this message does not clearly address you, reply with exactly "{PASS_TOKEN}" and nothing else.'
 
         try:
             response = await client.messages.create(
