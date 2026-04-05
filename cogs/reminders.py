@@ -395,25 +395,26 @@ class Reminders(commands.Cog):
             user = guild.get_member(r["user_id"]) or await guild.fetch_member(r["user_id"])
             if not user:
                 return
-            embed = discord.Embed(
-                title="🔄 Recurring Reminder!" if r["is_recurring"] else "⏰ Reminder!",
-                description=r["message"],
-                color=discord.Color.blue() if r["is_recurring"] else discord.Color.orange()
-            )
-            created = r["created_at"]
-            count = r.get("trigger_count", 0)
-            embed.set_footer(text=f"Set on {created.strftime('%b %d, %Y at %I:%M %p')}" +
-                             (f" • Trigger #{count + 1}" if r["is_recurring"] else ""))
-            embed.timestamp = datetime.now()
-            if r.get("image_url"):
-                embed.set_image(url=r["image_url"])
             if r["is_recurring"]:
-                nxt = calculate_next_trigger(r)
-                if nxt:
-                    embed.add_field(name="Next Reminder", value=nxt.strftime("%b %d, %Y at %I:%M %p"), inline=True)
-                else:
-                    embed.add_field(name="Status", value="This was the final reminder", inline=True)
-            await channel.send(f"{user.mention}", embed=embed)
+                embed = discord.Embed(
+                    description=r["message"],
+                    color=discord.Color.blue()
+                )
+                if r.get("image_url"):
+                    embed.set_image(url=r["image_url"])
+                await channel.send(embed=embed)
+            else:
+                embed = discord.Embed(
+                    title="⏰ Reminder!",
+                    description=r["message"],
+                    color=discord.Color.orange()
+                )
+                created = r["created_at"]
+                embed.set_footer(text=f"Set on {created.strftime('%b %d, %Y at %I:%M %p')}")
+                embed.timestamp = datetime.now()
+                if r.get("image_url"):
+                    embed.set_image(url=r["image_url"])
+                await channel.send(f"{user.mention}", embed=embed)
         except Exception as e:
             print(f"[ERROR] Failed to trigger reminder: {e}")
 
