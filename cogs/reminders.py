@@ -248,6 +248,7 @@ def reminder_to_dict(r):
         "week_of_month": r.get("week_of_month"),
         "weekly_day_of_week": r.get("weekly_day_of_week"),
         "trigger_count": r.get("trigger_count", 0),
+        "image_url": r.get("image_url"),
     }
 
 
@@ -362,6 +363,7 @@ class Reminders(commands.Cog):
             "week_of_month": kwargs.get("week_of_month"),
             "weekly_day_of_week": kwargs.get("weekly_day_of_week"),
             "trigger_count": 0,
+            "image_url": kwargs.get("image_url"),
         }
         self.reminders.append(r)
         self._save()
@@ -388,8 +390,10 @@ class Reminders(commands.Cog):
         try:
             guild = self.bot.get_guild(r["guild_id"])
             channel = guild.get_channel(r["channel_id"]) if guild else None
-            user = guild.get_member(r["user_id"]) if guild else None
-            if not channel or not user:
+            if not guild or not channel:
+                return
+            user = guild.get_member(r["user_id"]) or await guild.fetch_member(r["user_id"])
+            if not user:
                 return
             embed = discord.Embed(
                 title="🔄 Recurring Reminder!" if r["is_recurring"] else "⏰ Reminder!",
@@ -401,6 +405,8 @@ class Reminders(commands.Cog):
             embed.set_footer(text=f"Set on {created.strftime('%b %d, %Y at %I:%M %p')}" +
                              (f" • Trigger #{count + 1}" if r["is_recurring"] else ""))
             embed.timestamp = datetime.now()
+            if r.get("image_url"):
+                embed.set_image(url=r["image_url"])
             if r["is_recurring"]:
                 nxt = calculate_next_trigger(r)
                 if nxt:
@@ -457,7 +463,8 @@ class Reminders(commands.Cog):
         if dt is None:
             await ctx.send(f"❌ {msg}")
             return
-        r = self._new_reminder(ctx.author.id, ctx.channel.id, ctx.guild.id, dt, msg)
+        image_url = ctx.message.attachments[0].url if ctx.message.attachments else None
+        r = self._new_reminder(ctx.author.id, ctx.channel.id, ctx.guild.id, dt, msg, image_url=image_url)
         time_until = dt - datetime.now()
         days = time_until.days
         hours, rem = divmod(time_until.seconds, 3600)
@@ -498,7 +505,8 @@ class Reminders(commands.Cog):
             await ctx.send("❌ Could not parse recurring reminder. Use: `every day/week/month [at time] [message]`")
             return
         first_trigger, message, kwargs = result
-        r = self._new_reminder(ctx.author.id, ctx.channel.id, ctx.guild.id, first_trigger, message, recurring=True, **kwargs)
+        image_url = ctx.message.attachments[0].url if ctx.message.attachments else None
+        r = self._new_reminder(ctx.author.id, ctx.channel.id, ctx.guild.id, first_trigger, message, recurring=True, image_url=image_url, **kwargs)
         desc = self._format_recurrence(r)
         await ctx.send(f"✅ Recurring reminder set! {desc}. Starting {first_trigger.strftime('%b %d, %Y at %I:%M %p')}")
 
