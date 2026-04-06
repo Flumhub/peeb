@@ -204,9 +204,10 @@ def parse_reminder_input(text):
             if dt and dt > datetime.now():
                 return dt, msg_candidate or "Reminder"
 
-    # Try plain absolute
+    # Try plain absolute — shortest first so minimum time expression is consumed
+    # and the rest is preserved as the message
     words = text.split()
-    for i in range(len(words), 0, -1):
+    for i in range(1, len(words) + 1):
         time_candidate = " ".join(words[:i])
         msg_candidate = " ".join(words[i:])
         dt = parse_absolute(time_candidate)
